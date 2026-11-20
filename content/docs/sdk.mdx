@@ -31,6 +31,10 @@ const cambill = new CamBill({
 - **Cancel.** Pass `{ signal }` to abort a call and its retries.
 - **Webhooks.** `cambill.webhooks.constructEvent({ payload, signature, secret })` verifies and parses (see [Webhooks](/docs/webhooks)).
 
+## In the browser
+
+The checkout widget has components for React (`@cubis/cambill/react`), Vue (`/vue`) and Svelte (`/svelte`), and a framework-free `openCheckout` in `@cubis/cambill/widget`. They take the payment intent id and `client_secret` from your server, never an API key, and always load the current loader. See [Widget](/docs/widget).
+
 ## Types
 
 Every request and response is typed. `import type { Invoice, Customer, Subscription } from "@cubis/cambill"`. Amounts are `number` (minor units), times are strings.

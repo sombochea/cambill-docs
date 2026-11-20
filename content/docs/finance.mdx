@@ -1,18 +1,18 @@
 ---
 title: "Finance"
-description: "Analytics, a tax report and CSV exports for your accountant, from the invoices you issued."
+description: "Payment and invoice analytics, a tax report and CSV exports for your accountant."
 status: experimental
 ---
 
-**Finance** is in the dashboard (it is switched on per business). Everything is worked out from what each invoice recorded when it was issued: its subtotal, discount, tax by rate and total. A report never recomputes, so it cannot disagree with an invoice.
+**Finance** is in the dashboard (it is switched on per business). Payment figures come from settled payments, so they work with or without invoices. Invoice figures are worked out from what each invoice recorded when it was issued: its subtotal, discount, tax by rate and total. A report never recomputes, so it cannot disagree with an invoice.
 
-- A **period** is the issue date. Draft invoices are not sales. A voided invoice is shown in the register, marked, and left out of the totals.
+- For payments, a **period** is the settlement date. For invoices it is the issue date. Draft invoices are not sales. A voided invoice is shown in the register, marked, and left out of the totals.
 - Each **currency** is reported on its own. Dollars and riel are never added together.
 - Dates are in your viewer's zone, so a day means your day.
 
 ## Analytics
 
-Issued, paid, outstanding and overdue amounts; monthly recurring revenue from active subscriptions; money paid over time; who owes you, by how many days late (not due, 1-30, 31-60, 61-90, 90+); and the coupons used.
+**Payments** (every settled payment, invoice or not): the amount received, the number of payments, the average, the success rate (settled out of started in the period), received over time and a split by payment method. A payment that settled an invoice is also counted in the invoice figures below, and the Received card says how much of it that was. Then, when you use invoices: issued, paid, outstanding and overdue amounts; monthly recurring revenue from active subscriptions; money paid over time; who owes you, by how many days late (not due, 1-30, 31-60, 61-90, 90+); and the coupons used.
 
 ## Tax
 

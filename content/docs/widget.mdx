@@ -70,151 +70,42 @@ export async function POST(req: Request) {
 
 ### Open it in your page
 
-Load `/widget/v1/loader.js` from your CamBill host and call `CamBill.open`. Pick your stack:
+The `@cubis/cambill` package has components for React, Vue and Svelte (frameworks are optional peer dependencies, and the server-side client is not pulled into your bundle). They load the loader once per page, close the frame when the component goes away, and are safe to render on the server. Or load `/widget/v1/loader.js` yourself. Pick your stack:
 
-<Tabs items={["React", "Vue", "Plain HTML"]}>
+<Tabs items={["React", "Vue", "Svelte", "Plain HTML"]}>
 <Tab value="React">
 
-```tsx
-// CamBillCheckout.tsx
-import { useEffect, useRef } from "react"
-
-type Result = { id: string; status: string }
-type Handle = { close(): void }
-declare global {
-  interface Window {
-    CamBill?: { open(o: Record<string, unknown>): Handle }
-  }
-}
-
-const HOST = "https://cambill.cubis.tech"
-let loading: Promise<void> | undefined
-const loadLoader = () =>
-  (loading ??= new Promise((ok, fail) => {
-    if (window.CamBill) return ok()
-    const s = document.createElement("script")
-    s.src = `${HOST}/widget/v1/loader.js`
-    s.onload = () => ok()
-    s.onerror = () => fail(new Error("CamBill widget failed to load"))
-    document.head.append(s)
-  }))
-
-export function CamBillCheckout(props: {
-  intent: string // from your server
-  secret: string // from your server
-  onSuccess?: (r: Result) => void
-  onExpired?: (r: { id: string }) => void
-  onError?: (e: { code: string; message: string }) => void
-}) {
-  const box = useRef<HTMLDivElement>(null)
-  // Keep the latest callbacks without reopening the frame on every render.
-  const cb = useRef(props)
-  cb.current = props
-
-  useEffect(() => {
-    let handle: Handle | undefined
-    let live = true
-    loadLoader().then(() => {
-      if (!live || !box.current) return
-      handle = window.CamBill!.open({
-        intent: props.intent,
-        secret: props.secret,
-        container: box.current,
-        onSuccess: (r: Result) => cb.current.onSuccess?.(r),
-        onExpired: (r: { id: string }) => cb.current.onExpired?.(r),
-        onError: (e: { code: string; message: string }) => cb.current.onError?.(e),
-      })
-    })
-    return () => {
-      live = false
-      handle?.close() // also covers React strict mode's double effect
-    }
-  }, [props.intent, props.secret])
-
-  return <div ref={box} />
-}
+```bash
+npm install @cubis/cambill
 ```
 
-Use it:
-
 ```tsx
+import { CamBillCheckout } from "@cubis/cambill/react"
+
 function Pay({ orderId }: { orderId: string }) {
   const [pay, setPay] = useState<{ id: string; client_secret: string }>()
   const start = async () =>
     setPay(await (await fetch("/api/checkout", { method: "POST", body: JSON.stringify({ orderId, amount: 1050 }) })).json())
+  const confirm = () => fetch(`/api/orders/${orderId}/confirm`, { method: "POST" }) // your server checks the status
 
   if (!pay) return <button onClick={start}>Pay $10.50</button>
-  return (
-    <CamBillCheckout
-      intent={pay.id}
-      secret={pay.client_secret}
-      onSuccess={() => fetch(`/api/orders/${orderId}/confirm`, { method: "POST" })} // your server checks the status
-    />
-  )
+  return <CamBillCheckout intent={pay.id} secret={pay.client_secret} onSuccess={confirm} />
 }
 ```
+
+For a modal, use the hook: `const { open } = useCamBillCheckout()` and call `open({ intent, secret, onSuccess })` from a click. Changing a callback never reopens the frame.
 
 </Tab>
 <Tab value="Vue">
 
-```vue
-<!-- CamBillCheckout.vue -->
-<script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref, watch } from "vue"
-
-type Handle = { close(): void }
-const HOST = "https://cambill.cubis.tech"
-
-const props = defineProps<{ intent: string; secret: string }>()
-const emit = defineEmits<{
-  success: [r: { id: string; status: string }]
-  expired: [r: { id: string }]
-  error: [e: { code: string; message: string }]
-}>()
-
-const box = ref<HTMLElement>()
-let handle: Handle | undefined
-let loading: Promise<void> | undefined
-
-const loadLoader = () =>
-  (loading ??= new Promise<void>((ok, fail) => {
-    if ((window as any).CamBill) return ok()
-    const s = document.createElement("script")
-    s.src = `${HOST}/widget/v1/loader.js`
-    s.onload = () => ok()
-    s.onerror = () => fail(new Error("CamBill widget failed to load"))
-    document.head.append(s)
-  }))
-
-async function show() {
-  await loadLoader()
-  handle?.close()
-  handle = (window as any).CamBill.open({
-    intent: props.intent,
-    secret: props.secret,
-    container: box.value,
-    onSuccess: (r: { id: string; status: string }) => emit("success", r),
-    onExpired: (r: { id: string }) => emit("expired", r),
-    onError: (e: { code: string; message: string }) => emit("error", e),
-  })
-}
-
-onMounted(show)
-watch(() => [props.intent, props.secret], show)
-onBeforeUnmount(() => handle?.close())
-</script>
-
-<template>
-  <div ref="box" />
-</template>
+```bash
+npm install @cubis/cambill
 ```
-
-Use it:
 
 ```vue
 <script setup lang="ts">
 import { ref } from "vue"
-import CamBillCheckout from "./CamBillCheckout.vue"
+import { CamBillCheckout } from "@cubis/cambill/vue"
 
 const pay = ref<{ id: string; client_secret: string }>()
 async function start() {
@@ -228,6 +119,33 @@ const confirm = () => fetch("/api/orders/1001/confirm", { method: "POST" }) // y
   <button v-if="!pay" @click="start">Pay $10.50</button>
   <CamBillCheckout v-else :intent="pay.id" :secret="pay.client_secret" @success="confirm" />
 </template>
+```
+
+Events: `ready`, `success`, `expired`, `error`, `close`.
+
+</Tab>
+<Tab value="Svelte">
+
+```bash
+npm install @cubis/cambill
+```
+
+```svelte
+<script lang="ts">
+  import { camBillCheckout } from "@cubis/cambill/svelte"
+
+  let pay: { id: string; client_secret: string } | undefined
+  async function start() {
+    pay = await (await fetch("/api/checkout", { method: "POST", body: JSON.stringify({ orderId: "1001", amount: 1050 }) })).json()
+  }
+  const confirm = () => fetch("/api/orders/1001/confirm", { method: "POST" }) // your server checks the status
+</script>
+
+{#if !pay}
+  <button on:click={start}>Pay $10.50</button>
+{:else}
+  <div use:camBillCheckout={{ intent: pay.id, secret: pay.client_secret, onSuccess: confirm }}></div>
+{/if}
 ```
 
 </Tab>
@@ -324,9 +242,13 @@ if (status === "succeeded") await markOrderPaid(orderId)
 
 `status` is one indexed read with its own, larger rate budget, so it suits polling. It does not ask the bank: settlement happens through the checkout and the reconciler, so the webhook (`payment_intent.succeeded`) stays the source of truth. Check that the amount and `external_id` are what you created.
 
+## Staying up to date
+
+`/widget/v1/loader.js` is revalidated on every load (an `ETag` answer is a tiny `304`), so a release reaches your page on its next load, with no change in your code. The checkout inside the frame is always the current one. To freeze a release instead, pin it below.
+
 ## Pin a version
 
-`GET /widget/v1/integrity` returns the loader's content `version` and its Subresource Integrity hash. `/widget/v1/loader.js` is cached for 5 minutes; `/widget/v1/loader.js?v=<version>` is immutable. To pin a release:
+`GET /widget/v1/integrity` returns the loader's content `version` and its Subresource Integrity hash. `/widget/v1/loader.js?v=<version>` is immutable. To pin a release:
 
 ```html
 <script
