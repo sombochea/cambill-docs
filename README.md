@@ -17,3 +17,9 @@ curl second), secrets on the server in every example. When the API changes,
 change `backend/openapi/openapi.yaml`, the SDK (`packages/cambill-sdk-node`) and
 the matching page in the same change. `scripts/quickstart-check.ts` runs the
 quickstart's calls against a real stack, so the quickstart cannot rot.
+
+The API reference (`content/docs/api-reference.mdx`) is generated at build time from
+the published spec, `https://cambill.cubis.tech/v1/openapi.yaml`, so the docs host
+(Vercel) needs nothing from the rest of the repository. To build against another
+spec, set `OPENAPI_URL`, for example a local file:
+`OPENAPI_URL=file://$PWD/../../backend/openapi/openapi.yaml bun run build`.

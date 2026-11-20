@@ -1,8 +1,29 @@
-// Writes content/docs/api-reference.mdx from backend/openapi/openapi.yaml, so the
+// Writes content/docs/api-reference.mdx from the published OpenAPI description, so the
 // reference is the same file the server is tested against (TestOpenAPIMatchesTheRouter).
 //   bun scripts/gen-reference.ts
+// The docs are hosted on their own (Vercel), where the repository's backend/ folder is
+// not available, so the spec is fetched from the endpoint. OPENAPI_URL overrides it; the
+// repo's own builds (make packages, CI) point it at the working tree with a file:// URL
+// so a change to the spec shows up in the reference before it is deployed.
 type Json = Record<string, any>
-const spec = Bun.YAML.parse(await Bun.file(new URL("../../../backend/openapi/openapi.yaml", import.meta.url)).text()) as Json
+const SPEC_URL = process.env.OPENAPI_URL || "https://cambill.cubis.tech/v1/openapi.yaml"
+const PUBLIC_SPEC = "https://cambill.cubis.tech/v1/openapi.yaml"
+
+async function load(url: string): Promise<string> {
+  let last: unknown
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const res = await fetch(url, { signal: AbortSignal.timeout(15_000) })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      return await res.text()
+    } catch (e) {
+      last = e
+      if (attempt < 3) await Bun.sleep(attempt * 1000)
+    }
+  }
+  throw new Error(`Could not load the OpenAPI description from ${url}: ${last}. Set OPENAPI_URL to another address (or a file:// URL).`)
+}
+const spec = Bun.YAML.parse(await load(SPEC_URL)) as Json
 
 const ref = (o: Json | undefined): Json | undefined => {
   if (!o?.$ref) return o
@@ -32,7 +53,7 @@ function fields(schema: Json | undefined): string {
 
 const out: string[] = [
   `---\ntitle: "API reference"\ndescription: "Every endpoint, generated from openapi.yaml."\n---\n`,
-  `Base URL \`https://cambill.cubis.tech\`. Send your key in \`X-API-Key\`. The machine-readable description is [openapi.yaml](https://cambill.cubis.tech/v1/openapi.yaml). Amounts are integers in the minor unit. Errors are [problem+json](/docs/errors).\n`,
+  `Base URL \`https://cambill.cubis.tech\`. Send your key in \`X-API-Key\`. The machine-readable description is [openapi.yaml](${PUBLIC_SPEC}). Amounts are integers in the minor unit. Errors are [problem+json](/docs/errors).\n`,
 ]
 for (const tag of spec.tags as { name: string }[]) {
   out.push(`## ${tag.name}\n`)
