@@ -277,6 +277,12 @@ If your site sets a Content Security Policy, add `frame-src https://cambill.cubi
 | `height` | 240 to 1400 px (default 480), kept until the frame reports its own size. |
 | `width`, `overlay`, `closeColor` | Dialog layouts: width 280 to 640 px, backdrop and close button colour (a plain CSS colour; anything else is ignored). |
 
+| `autoClose` | `true` closes the widget 3 seconds after a successful payment; a number is the wait in seconds (0 to 60). Not set: it stays until the payer or your code closes it. |
+| `compact` | `true` for tighter spacing, for a small slot. |
+| `flat` | `true` removes the card's border, shadow and corners so the checkout sits on the surface you give it. |
+| `footer` | `"center"` centres "Payments secured by CamBill" and puts the language and theme switchers under it (default: side by side). |
+| `confirmClose` | `false` turns off the "Leave this payment?" question the payer sees when closing a dialog layout. It is never asked once the payment succeeded or expired, nor when your code calls `handle.close()`. |
+
 The close button sits in a bar the loader draws above the frame, so the checkout's language and theme controls never sit under it and the frame cannot hide it.
 | `onReady` | The frame has loaded. |
 | `onSuccess({ id, status })` | The customer paid. A hint: confirm on your server. |
