@@ -1,0 +1,59 @@
+---
+title: "Subscriptions"
+description: "Bill customers every period. Each period is an invoice they pay from a link."
+status: experimental
+---
+
+KHQR and Bakong payments are started by the payer, so CamBill cannot charge a card on file. A subscription instead **creates an invoice every period** and issues it; your customer pays each one.
+
+```ts
+const subscription = await cambill.subscriptions.create({
+  customer: customer.id,
+  items: [{ price: monthly.id, quantity: 1 }], // recurring prices
+  days_until_due: 14,
+  auto_issue: true, // false leaves each invoice as a draft for you to review
+})
+subscription.latest_invoice // the first period, already created
+```
+
+All items must share one currency and one interval. The first invoice is created at once; each later one is created when its period starts. A period is billed **exactly once**, even if CamBill runs on several servers.
+
+## Status
+
+`active`, `paused` or `canceled`. `past_due` is true when the latest invoice is open and overdue.
+
+```ts
+await cambill.subscriptions.pause(id)
+await cambill.subscriptions.resume(id) // restarts from now; missed periods are not billed
+await cambill.subscriptions.cancel(id, { at_period_end: true }) // or now: cancel(id)
+await cambill.subscriptions.update(id, { items: [/* … */], days_until_due: 7 }) // from the next period
+```
+
+## If an invoice cannot be issued
+
+Pausing and cancelling ask you to confirm first. A live-mode limit, an unverified business, or a feature turned off can stop an invoice from being issued. The invoice is kept as a **draft**, the subscription's `last_error` says why, and CamBill is alerted. A period is never skipped.
+
+## Test without waiting
+
+```ts
+await cambill.subscriptions.advance(id) // test mode only
+```
+
+bills the next period now. It answers `403` with a live key.
+
+## Webhooks
+
+`subscription.created`, `.updated` (with `previous_attributes`), `.paused`, `.resumed`, `.canceled`, `.renewed`, `.invoice_created` and `.past_due`. Each carries the whole subscription: your customer's and product's `external_id`, the items, the period. See [Webhooks](/docs/webhooks) for the payload and for using CamBill as your subscription billing.
+
+## Pull by your own ids
+
+```ts
+await cambill.subscriptions.list({ product_external_id: "plan_hosting" })
+await cambill.subscriptions.list({ customer_external_id: "crm-77", status: "active", expand: "customer,items" })
+```
+
+Filters: `customer`, `customer_external_id`, `product`, `product_external_id`, `price`, `coupon`, `status`; they combine. `expand` (`customer`, `items`) returns the same full object webhooks carry.
+
+## Discounts
+
+Pass `coupon` (an id or a code) when you create a subscription. See [Discounts and tax](/docs/discounts-tax) for the rules and how `duration` works.

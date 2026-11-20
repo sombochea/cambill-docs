@@ -1,0 +1,328 @@
+---
+title: "Checkout widget"
+description: "Show the hosted checkout inside your own page, with no redirect."
+status: beta
+---
+
+Your **server** creates the payment with your secret API key. Your **page** gets only that payment's `id` and `client_secret`, and opens the checkout in a frame served by CamBill. No redirect, and the key never reaches the browser.
+
+## The flow
+
+<Sequence
+  actors={[
+    { name: "Your page", sub: "browser" },
+    { name: "Your server", sub: "holds the API key" },
+    { name: "CamBill", sub: "API + checkout frame" },
+  ]}
+  steps={[
+    { from: 0, to: 1, label: "Customer presses Pay" },
+    { from: 1, to: 2, label: "POST /v1/payment-intents" },
+    { from: 2, to: 1, label: "id + client_secret", dashed: true },
+    { from: 1, to: 0, label: "id + client_secret only", dashed: true },
+    { from: 0, to: 2, label: "CamBill.open() shows the frame" },
+    { note: "The customer scans the KHQR\nor pays in the frame", at: 2 },
+    { from: 2, to: 0, label: "onSuccess({ id, status })", dashed: true },
+    { from: 0, to: 1, label: "Confirm order 1001" },
+    { from: 1, to: 2, label: "GET /payment-intents/:id/status" },
+    { from: 2, to: 1, label: "succeeded", dashed: true },
+    { from: 2, to: 1, label: "webhook payment_intent.succeeded", dashed: true },
+  ]}
+/>
+
+<Callout type="warn" title="Steps 7 to 10 are not optional">
+`onSuccess` runs in the customer's browser, so it is a hint for your UI (show a thank-you). Anyone can fake it. Ship the goods only after your **server** sees `succeeded`, from the status read (steps 8 and 9) or the signed [webhook](/docs/webhooks) (step 10).
+</Callout>
+
+## Set it up
+
+<Steps>
+<Step>
+
+### List your site
+
+**Dashboard → Checkout → Embed on your site.** Add every site that may show the checkout, one **exact origin** per line (`https://shop.example.com`). No wildcards, paths or credentials; `http://localhost:*` works for development. Any other site is blocked by the frame's `frame-ancestors`.
+
+</Step>
+<Step>
+
+### Create the payment on your server
+
+```ts
+// POST /api/checkout  (Next.js route handler; any backend works)
+import { CamBill } from "@cubis/cambill"
+
+const cambill = new CamBill({ apiKey: process.env.CAMBILL_API_KEY! })
+
+export async function POST(req: Request) {
+  const { orderId, amount } = await req.json()
+  const intent = await cambill.paymentIntents.create({
+    amount, // minor units: 1050 = $10.50
+    currency: "USD",
+    external_id: orderId, // creating twice returns the same payment
+  })
+  // Send the page only what it needs. Never the API key.
+  return Response.json({ id: intent.id, client_secret: intent.client_secret })
+}
+```
+
+</Step>
+<Step>
+
+### Open it in your page
+
+Load `/widget/v1/loader.js` from your CamBill host and call `CamBill.open`. Pick your stack:
+
+<Tabs items={["React", "Vue", "Plain HTML"]}>
+<Tab value="React">
+
+```tsx
+// CamBillCheckout.tsx
+import { useEffect, useRef } from "react"
+
+type Result = { id: string; status: string }
+type Handle = { close(): void }
+declare global {
+  interface Window {
+    CamBill?: { open(o: Record<string, unknown>): Handle }
+  }
+}
+
+const HOST = "https://cambill.cubis.tech"
+let loading: Promise<void> | undefined
+const loadLoader = () =>
+  (loading ??= new Promise((ok, fail) => {
+    if (window.CamBill) return ok()
+    const s = document.createElement("script")
+    s.src = `${HOST}/widget/v1/loader.js`
+    s.onload = () => ok()
+    s.onerror = () => fail(new Error("CamBill widget failed to load"))
+    document.head.append(s)
+  }))
+
+export function CamBillCheckout(props: {
+  intent: string // from your server
+  secret: string // from your server
+  onSuccess?: (r: Result) => void
+  onExpired?: (r: { id: string }) => void
+  onError?: (e: { code: string; message: string }) => void
+}) {
+  const box = useRef<HTMLDivElement>(null)
+  // Keep the latest callbacks without reopening the frame on every render.
+  const cb = useRef(props)
+  cb.current = props
+
+  useEffect(() => {
+    let handle: Handle | undefined
+    let live = true
+    loadLoader().then(() => {
+      if (!live || !box.current) return
+      handle = window.CamBill!.open({
+        intent: props.intent,
+        secret: props.secret,
+        container: box.current,
+        onSuccess: (r: Result) => cb.current.onSuccess?.(r),
+        onExpired: (r: { id: string }) => cb.current.onExpired?.(r),
+        onError: (e: { code: string; message: string }) => cb.current.onError?.(e),
+      })
+    })
+    return () => {
+      live = false
+      handle?.close() // also covers React strict mode's double effect
+    }
+  }, [props.intent, props.secret])
+
+  return <div ref={box} />
+}
+```
+
+Use it:
+
+```tsx
+function Pay({ orderId }: { orderId: string }) {
+  const [pay, setPay] = useState<{ id: string; client_secret: string }>()
+  const start = async () =>
+    setPay(await (await fetch("/api/checkout", { method: "POST", body: JSON.stringify({ orderId, amount: 1050 }) })).json())
+
+  if (!pay) return <button onClick={start}>Pay $10.50</button>
+  return (
+    <CamBillCheckout
+      intent={pay.id}
+      secret={pay.client_secret}
+      onSuccess={() => fetch(`/api/orders/${orderId}/confirm`, { method: "POST" })} // your server checks the status
+    />
+  )
+}
+```
+
+</Tab>
+<Tab value="Vue">
+
+```vue
+<!-- CamBillCheckout.vue -->
+<script setup lang="ts">
+import { onBeforeUnmount, onMounted, ref, watch } from "vue"
+
+type Handle = { close(): void }
+const HOST = "https://cambill.cubis.tech"
+
+const props = defineProps<{ intent: string; secret: string }>()
+const emit = defineEmits<{
+  success: [r: { id: string; status: string }]
+  expired: [r: { id: string }]
+  error: [e: { code: string; message: string }]
+}>()
+
+const box = ref<HTMLElement>()
+let handle: Handle | undefined
+let loading: Promise<void> | undefined
+
+const loadLoader = () =>
+  (loading ??= new Promise<void>((ok, fail) => {
+    if ((window as any).CamBill) return ok()
+    const s = document.createElement("script")
+    s.src = `${HOST}/widget/v1/loader.js`
+    s.onload = () => ok()
+    s.onerror = () => fail(new Error("CamBill widget failed to load"))
+    document.head.append(s)
+  }))
+
+async function show() {
+  await loadLoader()
+  handle?.close()
+  handle = (window as any).CamBill.open({
+    intent: props.intent,
+    secret: props.secret,
+    container: box.value,
+    onSuccess: (r: { id: string; status: string }) => emit("success", r),
+    onExpired: (r: { id: string }) => emit("expired", r),
+    onError: (e: { code: string; message: string }) => emit("error", e),
+  })
+}
+
+onMounted(show)
+watch(() => [props.intent, props.secret], show)
+onBeforeUnmount(() => handle?.close())
+</script>
+
+<template>
+  <div ref="box" />
+</template>
+```
+
+Use it:
+
+```vue
+<script setup lang="ts">
+import { ref } from "vue"
+import CamBillCheckout from "./CamBillCheckout.vue"
+
+const pay = ref<{ id: string; client_secret: string }>()
+async function start() {
+  const res = await fetch("/api/checkout", { method: "POST", body: JSON.stringify({ orderId: "1001", amount: 1050 }) })
+  pay.value = await res.json()
+}
+const confirm = () => fetch("/api/orders/1001/confirm", { method: "POST" }) // your server checks the status
+</script>
+
+<template>
+  <button v-if="!pay" @click="start">Pay $10.50</button>
+  <CamBillCheckout v-else :intent="pay.id" :secret="pay.client_secret" @success="confirm" />
+</template>
+```
+
+</Tab>
+<Tab value="Plain HTML">
+
+```html
+<script src="https://cambill.cubis.tech/widget/v1/loader.js"></script>
+<div id="checkout"></div>
+<script>
+  const widget = CamBill.open({
+    intent: "pi_live_…", // from your server
+    secret: "pi_live_…_secret_…", // from your server
+    container: "#checkout", // omit for a modal
+    onSuccess: ({ id }) => confirmOnYourServer(id),
+  })
+</script>
+```
+
+There is also a custom element for any framework without a binding. It emits `cambill-ready`, `cambill-success` (`detail: { id, status }`), `cambill-expired`, `cambill-error` and `cambill-close`.
+
+```html
+<cambill-checkout intent="pi_live_…" secret="pi_live_…_secret_…"></cambill-checkout>
+```
+
+</Tab>
+</Tabs>
+
+</Step>
+<Step>
+
+### Allow the frame in your CSP
+
+If your site sets a Content Security Policy, add `frame-src https://cambill.cubis.tech` (and `script-src` for the loader).
+
+</Step>
+</Steps>
+
+## Options and callbacks
+
+`CamBill.open` returns `{ close() }`.
+
+| Option | Use |
+| --- | --- |
+| `intent`, `secret` | The payment's `id` and `client_secret`. |
+| `container` | A selector or element to render in. Omit for a modal. |
+| `height` | 360 to 1400 px (default 560), kept until the frame reports its own size. |
+| `width`, `overlay`, `closeColor` | Modal only: width 280 to 640 px, backdrop and close button colour. |
+| `onReady` | The frame has loaded. |
+| `onSuccess({ id, status })` | The customer paid. A hint: confirm on your server. |
+| `onExpired({ id })` | The QR or payment expired. Create a new payment. |
+| `onError({ code, message })` | The checkout reported an error. |
+| `onClose` | The modal was closed. |
+
+## What the page and the frame say to each other
+
+<Sequence
+  actors={[
+    { name: "Your page", sub: "loader.js" },
+    { name: "Checkout frame", sub: "on the CamBill origin" },
+  ]}
+  steps={[
+    { from: 0, to: 1, label: "open the frame (secret in the #fragment)" },
+    { note: "The secret rides in the URL fragment:\nno server or log ever sees it", at: 1 },
+    { from: 1, to: 0, label: "ready", dashed: true },
+    { from: 1, to: 0, label: "resize (height)", dashed: true },
+    { from: 1, to: 0, label: "success | expired | error", dashed: true },
+    { from: 0, to: 1, label: "close()  removes the frame" },
+  ]}
+/>
+
+## How it stays safe
+
+- **Only listed sites can frame it.** The frame page's `frame-ancestors` is built from your exact origins, so a copied snippet on another site shows nothing.
+- **The secret stays out of logs.** It and your page's origin travel in the URL fragment, which is never sent to a server. The frame removes it from the address at once.
+- **Messages go to one origin.** The frame talks only to a parent whose origin you listed, with that exact origin as the target (never `*`). The loader accepts messages only from its own frame.
+- **The frame is sandboxed** (no top navigation) and sends no referrer.
+
+## Confirm on your server
+
+```ts
+// POST /api/orders/:id/confirm
+const { status } = await cambill.paymentIntents.status(intentId)
+if (status === "succeeded") await markOrderPaid(orderId)
+```
+
+`status` is one indexed read with its own, larger rate budget, so it suits polling. It does not ask the bank: settlement happens through the checkout and the reconciler, so the webhook (`payment_intent.succeeded`) stays the source of truth. Check that the amount and `external_id` are what you created.
+
+## Pin a version
+
+`GET /widget/v1/integrity` returns the loader's content `version` and its Subresource Integrity hash. `/widget/v1/loader.js` is cached for 5 minutes; `/widget/v1/loader.js?v=<version>` is immutable. To pin a release:
+
+```html
+<script
+  src="https://cambill.cubis.tech/widget/v1/loader.js?v=VERSION"
+  integrity="sha384-…"
+  crossorigin="anonymous"
+></script>
+```

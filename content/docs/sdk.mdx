@@ -1,0 +1,40 @@
+---
+title: "Node SDK"
+description: "@cubis/cambill: typed, zero dependencies, retries and idempotency built in."
+---
+
+```npm
+npm install @cubis/cambill
+```
+
+Node 20+, Bun, Deno and Workers. Server only: the key is a secret.
+
+```ts
+import { CamBill, CamBillError } from "@cubis/cambill"
+
+const cambill = new CamBill({
+  apiKey: process.env.CAMBILL_API_KEY!, // khpay_test_… or khpay_live_…
+  // baseUrl: "https://cambill.cubis.tech",
+  // timeout: 30_000, maxRetries: 2,
+})
+```
+
+## Resources
+
+`paymentIntents`, `customers`, `products`, `prices`, `coupons`, `taxRates`, `invoices`, `subscriptions`: each with `create`, `retrieve`, `list` and `update` where the API has them, plus actions such as `paymentIntents.status` (just `{ id, status }`, for polling), `invoices.finalize`, `invoices.void`, `subscriptions.pause` and `subscriptions.advance`. The method names follow the [API reference](/docs/api-reference).
+
+## What it does for you
+
+- **Idempotency.** Every POST carries an `Idempotency-Key`: yours (`{ idempotencyKey }`) or a random one, reused on each retry.
+- **Retries.** 429, 5xx and network errors are retried with backoff (and `Retry-After`), up to `maxRetries`.
+- **Errors.** Failures throw `CamBillError` with `status`, `title`, `traceId` and `retryable`. `status` 0 means no answer arrived.
+- **Cancel.** Pass `{ signal }` to abort a call and its retries.
+- **Webhooks.** `cambill.webhooks.constructEvent({ payload, signature, secret })` verifies and parses (see [Webhooks](/docs/webhooks)).
+
+## Types
+
+Every request and response is typed. `import type { Invoice, Customer, Subscription } from "@cubis/cambill"`. Amounts are `number` (minor units), times are strings.
+
+## No SDK for your language?
+
+The API is plain JSON over HTTPS and fully described by [`openapi.yaml`](https://cambill.cubis.tech/v1/openapi.yaml), so any OpenAPI generator works.

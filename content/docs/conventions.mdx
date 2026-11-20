@@ -1,0 +1,24 @@
+---
+title: "Conventions"
+description: "Idempotency, metadata, pagination and expanding."
+---
+
+## Idempotency
+
+Add `Idempotency-Key: <unique string>` to a POST you may retry. The same key and body returns the first response (with `Idempotent-Replay: true`) for 24 hours; the same key with a different body is `422`; one still running is `409`. A `5xx` is never remembered, so it can be retried for real. The SDK sends a random key on every POST and reuses it on each retry.
+
+## Metadata
+
+Customers, products, prices, invoices and subscriptions take `metadata`: up to 20 keys (`a-z`, `0-9`, `_`, `.`, `-`; 40 characters) with plain-text values up to 500 characters, returned exactly as sent. Use it for your own ids and notes.
+
+## Pagination
+
+Lists answer `{ data, total, page, limit }`. Send `page` and `limit` (up to 100). Most lists take `q`, a prefix search, and exact filters such as `external_id`.
+
+## Expanding
+
+`GET /v1/invoices/:id?expand=customer` includes the related object. Unknown values answer `400`.
+
+## Versions of the truth
+
+An issued invoice is a snapshot: its customer details, tax, discount and prices are copied onto it, so changing a price or a customer later never changes it.

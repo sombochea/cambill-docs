@@ -1,0 +1,18 @@
+---
+title: "Going live"
+description: "What changes when you use a live key."
+---
+
+1. **Connect your real account.** In **Connectors**, set up Bakong KHQR (or ABA) for **live** mode.
+2. **Get verified.** Live invoicing needs a business a CamBill admin has reviewed: in **Settings → Business → Verification**, choose **Business** (a registered company or shop: legal name, registration number, tax ID, country, address, contact email and phone) or **Individual** (a sole person: full name, country, address, contact email and phone, no registration or tax papers), then press **Request verification** (you can add a note about what you sell). The button stays off until every detail is saved. Payments do not need it.
+3. **Switch the key** to `khpay_live_…` and the webhook endpoint to your production URL.
+4. **Know the limits.** Live mode limits one invoice's size, how many you issue in 24 hours and how many are open at once. A refused request says which.
+5. **Handle failures.** Retry with an `Idempotency-Key` (the SDK does). On `429`, wait `Retry-After`.
+
+## Keep it safe
+
+- Keep keys and the webhook secret on your server and out of your repository.
+- Verify every webhook signature.
+- Do not show customers anything you have not read back from the API.
+
+CamBill logs every change with who made it (a person, an API key, a payer or the system). Admins can export it from **Audit logs**. CamBill does not hold your money: your bank settles to you.

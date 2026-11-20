@@ -1,0 +1,104 @@
+---
+title: "Quickstart"
+description: "A customer, a product and an invoice your customer can pay, in five minutes."
+---
+
+You will create a customer, sell a product, issue an invoice, watch it get paid, and start a subscription, all in test mode. The code here is run against a real stack on every change, so it works as written.
+
+<Steps>
+<Step>
+
+### Set up
+
+1. Sign up at the [dashboard](https://cambill.cubis.tech) and create a business.
+2. **Connectors → Bakong KHQR**: add an account ID and turn it on for **test** mode. This is how your customers will pay.
+3. Copy your **test API key** (`khpay_test_…`) from **API & webhooks**. Keep it on your server.
+
+```npm
+npm install @cubis/cambill
+```
+
+</Step>
+<Step>
+
+### Create a customer, a product and a price
+
+Amounts are whole numbers in the smallest unit: `5000` is $50.00.
+
+```ts
+import { CamBill } from "@cubis/cambill"
+
+const cambill = new CamBill({ apiKey: process.env.CAMBILL_API_KEY! })
+
+// external_id is your own id for them.
+const customer = await cambill.customers.create({ external_id: "user_42", name: "Sok Dara", email: "sok@example.com" })
+
+const product = await cambill.products.create({ name: "Consulting day" })
+const price = await cambill.prices.create({ product: product.id, currency: "USD", unit_amount: 5000 })
+```
+
+<Callout>
+Customers and invoices are experimental and switched on per business. If a call answers `403 Feature Not Enabled`, ask CamBill to enable it for your business.
+</Callout>
+
+</Step>
+<Step>
+
+### Issue an invoice
+
+```ts
+const draft = await cambill.invoices.create({
+  customer: customer.id,
+  currency: "USD",
+  lines: [{ price: price.id, quantity: 2 }],
+  due_in_days: 14,
+  metadata: { order_id: "1001" },
+})
+const invoice = await cambill.invoices.finalize(draft.id)
+console.log(invoice.number, invoice.total, invoice.hosted_invoice_url)
+// INV-000001 10000 https://…/invoice/inv_test_…
+```
+
+Send `hosted_invoice_url` to your customer. They see the invoice, pay it, and can download a PDF with a QR code.
+
+</Step>
+<Step>
+
+### Pay it, and know it is paid
+
+Open the link and press **Pay**. In test mode the checkout has a **Simulate payment** button.
+
+```ts
+const paid = await cambill.invoices.retrieve(invoice.id)
+paid.status // "paid"
+```
+
+In production, do not poll: handle the [`invoice.paid` webhook](/docs/webhooks).
+
+</Step>
+<Step>
+
+### Bill monthly
+
+```ts
+const monthly = await cambill.prices.create({ product: product.id, currency: "USD", unit_amount: 900, type: "recurring", interval: "month" })
+const subscription = await cambill.subscriptions.create({ customer: customer.id, items: [{ price: monthly.id, quantity: 1 }] })
+
+// Test mode only: bill next month now, instead of waiting.
+await cambill.subscriptions.advance(subscription.id)
+```
+
+Each period is an invoice; your customer pays each one from its link.
+
+</Step>
+</Steps>
+
+## Or start with sample data
+
+In the dashboard, **API & webhooks → Add sample data** creates a customer, a product with prices, a tax rate and an issued invoice in test mode, so you have something to call straight away.
+
+## Next
+
+- [Webhooks](/docs/webhooks): get told when something happens.
+- [Conventions](/docs/conventions): idempotency, metadata, pagination.
+- [Going live](/docs/production).

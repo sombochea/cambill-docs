@@ -1,0 +1,27 @@
+{
+  "title": "CamBill",
+  "pages": [
+    "---Get started---",
+    "index",
+    "quickstart",
+    "concepts",
+    "---Build---",
+    "payments",
+    "widget",
+    "customers",
+    "catalogue",
+    "discounts-tax",
+    "invoices",
+    "subscriptions",
+    "finance",
+    "webhooks",
+    "---Ship---",
+    "testing",
+    "production",
+    "---Reference---",
+    "api-reference",
+    "sdk",
+    "conventions",
+    "errors"
+  ]
+}

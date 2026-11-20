@@ -1,0 +1,35 @@
+---
+title: "Concepts"
+description: "Test and live mode, keys, amounts, ids and the objects you will use."
+---
+
+## Test and live
+
+Every business has two modes. **The key decides the mode**: `khpay_test_…` always works in test mode, `khpay_live_…` in live. They never mix: a test key cannot read a live object, and test mode never moves real money. Test mode has the same features as live, plus a way to simulate a payment.
+
+## Keys
+
+A key is a secret. Send it in the `X-API-Key` header, from your server only. Rotate it in the dashboard; the old key stops working at once. A request with an unknown key answers `401`.
+
+## Amounts and times
+
+- **Money is an integer in the currency's smallest unit.** USD in cents (`1050` is $10.50), KHR in riel (`4000` is ៛4,000). Never a decimal.
+- **Currencies:** `USD` and `KHR`.
+- **Times** are RFC 3339 in UTC, like `2026-12-01T09:30:00Z`.
+
+## Objects and ids
+
+Ids are readable: `cus_test_…`, `prod_…`, `price_…`, `inv_…`, `sub_…`, `pi_…`. The mode is in the id.
+
+| Object | What it is |
+| --- | --- |
+| Payment intent | One payment: an amount, a KHQR, a status. |
+| Customer | Someone you bill. Has your own `external_id`. |
+| Product, price | What you sell, and what it costs, once or every period. |
+| Coupon, tax rate | A discount; a tax. |
+| Invoice | A numbered bill your customer pays from a link. |
+| Subscription | Bills a customer for recurring prices, one invoice a period. |
+
+## Money never moves through CamBill
+
+Your customer's bank settles to your own account through your connector. CamBill watches for the payment, marks the invoice paid and tells you. That is why invoices must match exactly: a payment that does not equal the invoice is not applied.

@@ -1,0 +1,67 @@
+---
+title: "Invoices"
+description: "Draft, issue, share and get paid. With a payer's page and a PDF."
+status: experimental
+---
+
+An invoice goes **draft → open → paid** (or **void**).
+
+```ts
+const draft = await cambill.invoices.create({
+  customer: customer.id,
+  currency: "USD",
+  lines: [{ description: "Consulting", quantity: 2, unit_amount: 5000 }],
+  memo: "Thank you.",
+  due_in_days: 14,
+  external_id: "order_1001", // makes create idempotent
+})
+const invoice = await cambill.invoices.finalize(draft.id) // issued: number + link
+```
+
+## Draft
+
+A draft is yours to change (`invoices.update`) or delete (`invoices.delete`). It has no number and no link.
+
+## Issued
+
+`finalize` gives the invoice a gap-free number (`INV-000123` by default) and `hosted_invoice_url`. **An issued invoice cannot be edited.** To change it, void it and create a new one; `duplicate` copies it into a new draft.
+
+## What your customer sees
+
+The link opens a page with the invoice, your logo and colours, and a **Pay** button that opens the checkout. After paying, they come back to the invoice, now marked Paid. They can **download a PDF**, which carries a "Pay online" link and a QR code for the same page. Anyone who thinks an invoice is a scam can report it; enough reports take the link offline until you answer.
+
+Pick the page's look in **Dashboard → Checkout → Invoice** (shown when invoicing is on): **Split** (summary beside the invoice), **Centered** (one column, like a hosted receipt), **Document** (a paper sheet) or **Banner** (a brand-colour header over the invoice). Add a footer line and terms there too. Every layout fits a phone, and the PDF is the same for all.
+
+## Activity
+
+`invoices.events(id)` is the invoice's timeline: created, issued, viewed, checkout opened, paid, voided, reported. Payer addresses are kept for 180 days.
+
+## Rules that protect you and your customers
+
+- A payment must **equal the total exactly** to settle the invoice.
+- A payment that arrives on an invoice you just voided still marks it paid: money cannot be un-moved. The `invoice.paid` event says `paid_after_void: true`.
+- Text on an invoice cannot contain links, domains or chat handles.
+- In **live** mode your business must be verified (**Settings → Business → Verification**; it needs your legal details first) and invoicing is limited per invoice, per day and by how many are open. Test mode has no limits.
+
+See [Discounts and tax](/docs/discounts-tax) for the totals.
+
+## Recurring lines and billed periods
+
+A line made from a recurring price carries `recurring` (`interval`, `interval_count`), so a page can say "Every month". An invoice made by a [subscription](/docs/subscriptions) also has `subscription`, `period_start` and `period_end` (the end is when the next period starts). The hosted page and the PDF print both under the line.
+
+## Invoice numbers
+
+Each business has **one unbroken series** per mode (test and live), which is what tax authorities expect: every issued invoice has a unique number, none are missing, none are reused, and an issued number never changes. A draft has no number; a void invoice keeps its.
+
+You choose how the number is written in **Settings → Billing → Invoice numbers**:
+
+| Setting | Example |
+| --- | --- |
+| Prefix (capitals and digits, up to 12) | `TAX` |
+| Digits (zero padding, 1 to 10) | `0042` |
+| Date in the number | none, `2027`, or `202703` |
+| Restart every year (needs a date, so numbers stay unique) | `TAX-2027-0001` again each January |
+| Random characters (0 to 6, added at the end) | `TAX-2027-0042-K7QM` |
+| Next number | can only move forward |
+
+A change applies to invoices issued after it, and the sequence carries on. The whole number is at most 32 characters. Whether a format meets your country's rules (for example a tax invoice with a buyer's VAT number, which you can set on the [customer](/docs/customers)) is for you and your accountant to confirm.

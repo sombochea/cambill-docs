@@ -1,0 +1,51 @@
+---
+title: "Products and prices"
+description: "What you sell, and what it costs, once or every period."
+status: experimental
+---
+
+A **product** is what you sell. A **price** is an amount for it, either once or on a schedule.
+
+```ts
+const product = await cambill.products.create({ name: "Hosting", external_id: "sku_hosting" })
+
+const once = await cambill.prices.create({ product: product.id, currency: "USD", unit_amount: 1000 })
+const monthly = await cambill.prices.create({
+  product: product.id,
+  currency: "USD",
+  unit_amount: 900,
+  type: "recurring",
+  interval: "month", // day | week | month | year
+  interval_count: 1,
+})
+```
+
+## A price never changes
+
+Its amount and currency are fixed. To charge more, create a new price and archive the old one. That is what keeps old invoices and running subscriptions true.
+
+```ts
+await cambill.prices.update(oldPrice.id, { active: false })
+```
+
+You can still rename a price (`nickname`) and change its `metadata`. Sending a different `unit_amount` answers `400 Price Is Fixed`.
+
+## Use a price on an invoice
+
+```ts
+lines: [{ price: once.id, quantity: 3 }] // amount and description come from the catalogue
+```
+
+The product's name becomes the line's description unless you give one. The price's currency must match the invoice's.
+
+## Archive a product
+
+`products.update(id, { name, active: false })`. Archived products and prices cannot be added to new invoices or subscriptions.
+
+## Pricing when you create a product
+
+The product form takes prices too: add one or more (one time or recurring) and they are created with the product. To change an existing product's name, description or external ID, use **Edit** on its page. A price's amount never changes: add a new price and archive the old one.
+
+## Features are separate
+
+Products, coupons, subscriptions and finance reports are each switched on for a business on their own. Turning on products does not turn on coupons or subscriptions; ask CamBill to enable the ones you need. Subscriptions also need invoicing, customers and products.

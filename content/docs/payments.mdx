@@ -1,0 +1,42 @@
+---
+title: "Payments"
+description: "One payment: a KHQR to show, a checkout link, and a status."
+---
+
+A **payment intent** is one payment.
+
+```ts
+const intent = await cambill.paymentIntents.create({
+  amount: 1050, // $10.50
+  currency: "USD",
+  external_id: "order_1001", // your id; creating twice returns the same intent
+  description: "Order 1001",
+})
+```
+
+You get back:
+
+| Field | Use it to |
+| --- | --- |
+| `payment_link` | Send your customer to a hosted checkout. |
+| `qr_string` | Draw a Bakong KHQR yourself, when the Bakong connector is on. It is validated, and expires in 5 minutes (`qr_expires_at`). Create again with the same `external_id` for a fresh one. |
+| `client_secret` | Open the checkout from your own page. Treat it like a password. |
+| `status` | `requires_payment_method`, `succeeded` or `expired`. |
+
+## Know it is paid
+
+Handle the `payment_intent.succeeded` [webhook](/docs/webhooks). To read the status instead:
+
+```bash
+curl https://cambill.cubis.tech/v1/payment-intents/pi_test_… -H "X-API-Key: $CAMBILL_API_KEY"
+```
+
+For polling, `GET /v1/payment-intents/{id}/status` returns only `{ id, status }`. It is one indexed read with its own budget (600 per minute per business, the rest share 100), and it does not ask the bank, so keep the webhook as your source of truth. With the SDK: `cambill.paymentIntents.status(id)`.
+
+## Show it in your page
+
+Do not want a redirect? Open the checkout inside your own page with the [checkout widget](/docs/widget).
+
+## Idempotent on `external_id`
+
+Creating a payment with an `external_id` you already used returns the original. Using it with a different amount or currency is `409`. This makes a retried request safe even without an `Idempotency-Key`.

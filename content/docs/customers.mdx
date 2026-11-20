@@ -1,0 +1,42 @@
+---
+title: "Customers"
+description: "Keep the people you bill, with your own id and your own data."
+status: experimental
+---
+
+```ts
+const customer = await cambill.customers.create({
+  external_id: "user_42", // your user or CRM id
+  name: "Sok Dara",
+  email: "sok@example.com",
+  phone: "+855 12 345 678",
+  tax_id: "K002-987654321", // their VAT number, printed on their invoices
+  metadata: { plan: "gold" },
+})
+```
+
+Give at least one of `name`, `email` or `phone`.
+
+## Find them from your system
+
+`external_id` is unique per business, so you can always find the customer for one of your users:
+
+```ts
+const { data } = await cambill.customers.list({ external_id: "user_42" })
+```
+
+Creating a second customer with the same `external_id` answers `409` and names the existing one.
+
+## Bill them
+
+Name the customer on an invoice or a subscription by id (`customer`) or by your own id (`customer_external_id`). Their name, email, phone and tax ID are **copied onto the invoice when it is created** and never change after, so an invoice always reads as it did when it was issued.
+
+```ts
+await cambill.invoices.create({ customer_external_id: "user_42", currency: "USD", lines: [/* … */] })
+```
+
+`retrieve(id, { expand: "customer" })` includes the customer.
+
+## Erase them
+
+`DELETE /v1/customers/:id` erases their personal data (name, email, phone, metadata, external id) and frees the external id. The id stays, so invoices that name it still make sense; an invoice keeps its own copy of the name, because an invoice is a financial record.

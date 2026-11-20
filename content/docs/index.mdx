@@ -1,0 +1,24 @@
+---
+title: "CamBill"
+description: "Accept KHQR and Bakong payments, invoice customers, sell from a catalogue and bill subscriptions."
+---
+
+CamBill lets you get paid in Cambodia without building a billing system. You make a payment or an invoice with one API call; your customer pays with any KHQR banking app; CamBill tells you when the money arrives.
+
+<Cards>
+  <Card title="Quickstart" href="/docs/quickstart">A customer, a product and an invoice your customer can pay, in five minutes.</Card>
+  <Card title="Node SDK" href="/docs/sdk">`@cubis/cambill`: typed, zero dependencies, retries and idempotency built in.</Card>
+  <Card title="API reference" href="/docs/api-reference">Every endpoint, generated from the same OpenAPI file the server is tested against.</Card>
+  <Card title="Webhooks" href="/docs/webhooks">Know the moment an invoice is paid, without polling.</Card>
+</Cards>
+
+## What you can build
+
+- **One-off payments.** A payment intent gives you a KHQR code to show, a hosted checkout, and a status to read.
+- **Invoices.** Itemised, numbered, with tax and discounts. Your customer gets a page to pay and a PDF to keep.
+- **A catalogue.** Products with one-time and recurring prices.
+- **Subscriptions.** Each period becomes an invoice your customer pays from a link. No card is stored.
+
+## How it works
+
+You call the API from your server with a secret key. CamBill never holds the money: your customer's bank settles straight to your own account through the connector you set up. Test mode is a full copy of the product with a "simulate payment" button, so you can build the whole flow without moving money.

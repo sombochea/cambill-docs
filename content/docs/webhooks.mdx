@@ -1,0 +1,110 @@
+---
+title: "Webhooks"
+description: "Get told when something happens, and check that it really came from CamBill."
+---
+
+Set your endpoint in **API & webhooks**. CamBill sends a `POST` with JSON and retries failures with backoff.
+
+```json
+{ "id": "evt_…", "type": "invoice.paid", "created_at": "2026-12-01T09:30:00Z", "data": { "id": "inv_test_…", "status": "paid", "total": 10000 } }
+```
+
+Every event has the same envelope: `id` (unique, use it to ignore a repeat), `type`, `created_at`, and `data`, the object itself.
+
+## Events
+
+| Event | When | `data` |
+| --- | --- | --- |
+| `payment_intent.succeeded` | A payment settled. | the payment intent |
+| `payment_intent.expired` | A payment intent expired unpaid. | the payment intent |
+| `invoice.finalized` | An invoice was issued. | the invoice |
+| `invoice.paid` | An invoice was paid (`paid_after_void` is true if you had just voided it). | the invoice |
+| `invoice.voided` | An issued invoice was voided. | the invoice |
+| `customer.created`, `customer.updated` | A customer changed. | the customer |
+| `customer.deleted` | A customer was erased. | `{ id, object, deleted }` |
+| `subscription.created` | A subscription started. | the subscription |
+| `subscription.updated` | Anything about it changed, including pause and resume. | the subscription, with `previous_attributes` |
+| `subscription.paused`, `subscription.resumed` | Sent with `subscription.updated`, for listeners that only care about these. | the subscription, with `previous_attributes` |
+| `subscription.canceled` | It ended, now or at its period end. | the subscription |
+| `subscription.renewed` | A new period started (not the first). | the subscription |
+| `subscription.invoice_created` | An invoice was created for a period. | the subscription, plus `invoice`, `period_start`, `period_end`, `invoice_details` |
+| `subscription.past_due` | An invoice of a subscription is overdue. Once per invoice. | the subscription, plus `past_due_invoice` |
+
+## Subscription events carry the whole subscription
+
+An external system that bills through CamBill should not need a second call to understand an event. Every `subscription.*` event's `data` is the subscription as the API returns it, plus:
+
+- `customer_details`: `{ id, external_id, name, email, phone }`. `external_id` is **your** id for the customer.
+- `items[]`: each item's `price`, `quantity`, `unit_amount`, `currency`, `interval`, `nickname` and its `product` `{ id, external_id, name }`. `product.external_id` is **your** id for the plan.
+- `current_period_start` / `current_period_end`, `status`, `cancel_at_period_end`, `coupon`, `metadata`.
+- On a change, `previous_attributes`: the old value of each field that changed (`status`, `items`, `days_until_due`, `auto_issue`, `cancel_at_period_end`, `metadata`).
+
+```json
+{
+  "id": "evt_9f2c…",
+  "type": "subscription.resumed",
+  "created_at": "2027-02-01T09:30:00Z",
+  "data": {
+    "id": "sub_live_…", "object": "subscription", "status": "active",
+    "currency": "USD", "interval": "month", "interval_count": 1,
+    "current_period_start": "2027-02-01T09:30:00Z", "current_period_end": "2027-03-01T09:30:00Z",
+    "customer": "cus_live_…",
+    "customer_details": { "id": "cus_live_…", "external_id": "crm-77", "name": "Dara", "email": "dara@example.com", "phone": "" },
+    "items": [{
+      "price": "price_live_…", "quantity": 1, "unit_amount": 900, "currency": "USD", "interval": "month", "interval_count": 1, "nickname": "",
+      "product": { "id": "prod_live_…", "external_id": "plan_hosting", "name": "Hosting" }
+    }],
+    "previous_attributes": { "status": "paused" }
+  }
+}
+```
+
+The SDK types this: `constructEvent` returns a union, so `event.type === "subscription.resumed"` narrows `event.data`.
+
+### Using CamBill as your subscription billing
+
+Keep your own users and plans, give CamBill their ids (`external_id` on customers and products), and:
+
+1. **Listen**: on `subscription.created` and `subscription.renewed`, activate or extend access for `data.customer_details.external_id` on `data.items[0].product.external_id`; on `subscription.canceled`, end it; on `subscription.past_due`, warn or suspend. The customer pays each invoice from its link, so `invoice.paid` tells you the money arrived.
+2. **Reconcile**: pull what CamBill has, by your own ids, whenever you like:
+
+```ts
+const mine = await cambill.subscriptions.list({
+  product_external_id: "plan_hosting",
+  status: "active",
+  expand: "customer,items", // the same full shape as the events
+})
+const one = await cambill.subscriptions.list({ customer_external_id: "crm-77" })
+```
+
+An id that matches nothing gives an empty list, not an error.
+
+## Verify every one
+
+Each request has an `X-Cambill-Signature: t=<unix>,v1=<hex>` header: an HMAC-SHA256 of `"<t>.<raw body>"` with your signing secret (`whsec_…`). Check it against the **raw body**, before parsing.
+
+```ts
+import { constructEvent } from "@cubis/cambill"
+
+app.post("/webhooks/cambill", express.raw({ type: "application/json" }), async (req, res) => {
+  try {
+    const event = await constructEvent({
+      payload: req.body, // the raw bytes
+      signature: req.header("x-cambill-signature")!,
+      secret: process.env.CAMBILL_WEBHOOK_SECRET!,
+    })
+    if (event.type === "invoice.paid") await markPaid(event.data.id) // typed by event.type
+    res.sendStatus(200)
+  } catch {
+    res.sendStatus(400)
+  }
+})
+```
+
+A timestamp more than 5 minutes old is refused, so a captured request cannot be replayed later.
+
+## Handling them well
+
+- Answer `2xx` quickly and do the work after. Anything else is retried.
+- Events can arrive more than once and out of order: make your handler idempotent (use the event `id` or the object's `status`).
+- Treat an event as a hint if you must be certain: `retrieve` the object and trust that.

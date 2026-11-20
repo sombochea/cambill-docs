@@ -1,0 +1,12 @@
+---
+title: "Testing"
+description: "Test mode, sample data, and a clock you can move."
+---
+
+- **Test keys** (`khpay_test_…`) work in test mode only. Nothing moves real money.
+- **Simulate a payment** with the button on any test checkout. This is how you test `payment_intent.succeeded` and `invoice.paid`.
+- **Sample data:** the dashboard's **Add sample data** (or `POST /v1/businesses/:id/sandbox/seed`) creates a customer, a product with a one-time and a monthly price, a tax rate and an issued invoice. Run it again for another invoice.
+- **Move the clock:** `subscriptions.advance(id)` bills the next period now.
+- **Retry safely:** send the same `Idempotency-Key` twice and you get the first response back.
+
+Test mode has no invoice limits and does not need your business to be verified.

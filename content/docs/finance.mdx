@@ -1,0 +1,34 @@
+---
+title: "Finance"
+description: "Analytics, a tax report and CSV exports for your accountant, from the invoices you issued."
+status: experimental
+---
+
+**Finance** is in the dashboard (it is switched on per business). Everything is worked out from what each invoice recorded when it was issued: its subtotal, discount, tax by rate and total. A report never recomputes, so it cannot disagree with an invoice.
+
+- A **period** is the issue date. Draft invoices are not sales. A voided invoice is shown in the register, marked, and left out of the totals.
+- Each **currency** is reported on its own. Dollars and riel are never added together.
+- Dates are in your viewer's zone, so a day means your day.
+
+## Analytics
+
+Issued, paid, outstanding and overdue amounts; monthly recurring revenue from active subscriptions; money paid over time; who owes you, by how many days late (not due, 1-30, 31-60, 61-90, 90+); and the coupons used.
+
+## Tax
+
+Per currency and rate: the invoices, the taxable amount and the tax charged. Rates are grouped by what was charged (name, percentage, included or not), so a rate you edited mid-period shows as the two it was. It also shows sales with no tax and voided invoices, and your registration number.
+
+## Reports (CSV)
+
+| Report | One row per | For |
+| --- | --- | --- |
+| Tax invoice register | issued invoice | A tax filing: number, date, customer and their tax ID, your tax ID, tax by rate (up to three, then a count), total, status |
+| Sales ledger | invoice line | Revenue by line: description, quantity, amount, discount, tax |
+| Receivables aging | open invoice | Collections: due date, days late, bucket |
+| Payments reconciliation | paid invoice | The bank: receipt, method, bank reference, settled date |
+
+Amounts are plain decimals in the invoice's currency. Cells that could run as a formula in a spreadsheet are escaped. Each download is recorded in the [audit log](/docs/production), and a file holds at most 100,000 rows: narrow the period for more.
+
+## What it is not
+
+These are reports of your invoices, with the data tax authorities ask for (sequential numbers, buyer and seller tax IDs, tax by rate). They do not file anything, and whether a format meets your country's rules is for you and your accountant to confirm.

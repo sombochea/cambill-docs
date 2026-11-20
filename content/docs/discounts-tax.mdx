@@ -1,0 +1,71 @@
+---
+title: "Discounts and tax"
+description: "Coupons, tax rates, and exactly how the total is worked out."
+status: experimental
+---
+
+## Coupons
+
+```ts
+const coupon = await cambill.coupons.create({
+  name: "Launch 10%",
+  code: "LAUNCH10", // optional: what you or a customer types
+  percent_bps: 1000,
+  max_redemptions: 100,
+})
+// or a fixed amount: { name: "$5 off", amount_off: 500, currency: "USD" }
+
+// by id or by code:
+await cambill.invoices.create({ coupon: "LAUNCH10", currency: "USD", lines: [/* … */] })
+```
+
+`percent_bps` is in basis points: `1000` is 10%. A coupon is **used up when the invoice is issued**, under a lock, so two invoices cannot both take the last use. It cannot take an invoice to zero. A code is stored in capitals and is unique; an unknown id or code always answers the same `400`.
+
+### Rules
+
+All optional. One check decides them for the editor preview, the draft and issuing, so they cannot disagree (the invoice is checked again when it is issued).
+
+| Rule | Field |
+| --- | --- |
+| Not before / not after | `starts_at`, `redeem_by` |
+| Total uses | `max_redemptions` |
+| Uses per customer | `max_per_customer` (needs a saved customer on the invoice) |
+| New customers only | `first_time_only` (a customer with no issued invoice yet) |
+| Minimum invoice | `min_subtotal` with `currency`, before discount |
+| Only some products | `products: [productId]`: only those lines are discounted |
+
+You can change a coupon's name, code, rules and limits later (`coupons.update`); what it takes off and for how long (`duration`) are fixed. Invoices already issued keep the discount they got.
+
+### On subscriptions
+
+```ts
+await cambill.subscriptions.create({ customer, items, coupon: "LAUNCH10" })
+```
+
+The coupon must qualify when the subscription starts. Its `duration` says which periods it discounts: `once` the first, `repeating` the first `duration_months` months, `forever` every one. It is used up once, by the first invoice, not once per period.
+
+## Tax rates
+
+Set your tax registration number and add rates in **Settings → Billing** (the number is printed on every invoice):
+
+```ts
+const vat = await cambill.taxRates.create({ name: "VAT", percent_bps: 1000, is_default: true })
+const included = await cambill.taxRates.create({ name: "VAT (included)", percent_bps: 1000, inclusive: true })
+```
+
+A line with no `tax_rates` gets the default rate. Send `tax_rates: []` for none, or name up to three. You can rename a rate, change its percentage, or switch it between inclusive and exclusive. Invoices keep a copy of the tax they charged (name, percentage and amount), so a change applies only to invoices made after it. A rate no invoice was charged with can be deleted (`taxRates.delete`); a used one answers `409`, so archive it with `active: false` and the register of what you charged keeps its name.
+
+Save a customer's own tax number with `tax_id` on the [customer](/docs/customers). It is copied onto each invoice you make for them and printed on the invoice and PDF, as buyers registered for VAT need.
+
+## How the total is worked out
+
+CamBill does this in one place, in whole numbers, and stores the result on the invoice:
+
+1. Each line: `amount = quantity × unit_amount`.
+2. A discount is shared across lines in proportion to their amounts; the leftover cents go to the lines with the largest remainders, so the shares add up exactly.
+3. **Exclusive tax** is added: `round_half_up(taxable × rate)`.
+4. **Inclusive tax** is already in the price: it is the part of the taxable amount that is tax.
+
+`total = subtotal − discount_total + exclusive tax`. The invoice shows `subtotal`, `discount_total`, `tax_total` and a `tax_breakdown` by rate.
+
+Example: 2 × $100.00 with a 10% coupon and 10% VAT → subtotal 20000, discount 2000, taxable 18000, VAT 1800, **total 19800**.

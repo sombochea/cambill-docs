@@ -1,0 +1,34 @@
+---
+title: "Errors"
+description: "What a failure looks like, and what to do about it."
+---
+
+Failures are `application/problem+json` ([RFC 9457](https://www.rfc-editor.org/rfc/rfc9457)):
+
+```json
+{ "type": "https://cambill.cubis.tech/errors/403", "title": "Feature Not Enabled", "status": 403,
+  "detail": "This feature is not enabled for your business.", "instance": "/v1/customers", "trace_id": "9f2c…" }
+```
+
+Its `type` is a page: [`https://cambill.cubis.tech/errors/403`](https://cambill.cubis.tech/errors/403) explains that status, its common titles and what to do. See [all errors](https://cambill.cubis.tech/errors).
+
+Quote `trace_id` when you ask for help: it finds the request in the audit log. In the SDK it is a `CamBillError`:
+
+```ts
+try {
+  await cambill.invoices.finalize(id)
+} catch (e) {
+  if (e instanceof CamBillError && e.title === "Business Not Verified") { /* … */ }
+}
+```
+
+| Status | Meaning | Do |
+| --- | --- | --- |
+| `400` | The request is not valid; `detail` says what. | Fix it. Do not retry. |
+| `401` | Unknown or missing key. | Check the key and the mode. |
+| `403` | Not allowed: a feature is off, or the business is not verified. | Read `title`. |
+| `404` | Not found, or it belongs to another business or mode. | Check the id and the key's mode. |
+| `409` | A conflict: a used `external_id`, an invoice that cannot change. | Read `detail`. |
+| `422` | Understood but refused: a reused idempotency key, a limit. | Read `detail`. |
+| `429` | Too many requests. | Wait `Retry-After`. |
+| `5xx` | Our side. | Retry with the same `Idempotency-Key`. |

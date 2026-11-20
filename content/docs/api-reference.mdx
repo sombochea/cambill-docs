@@ -1,0 +1,834 @@
+---
+title: "API reference"
+description: "Every endpoint, generated from openapi.yaml."
+---
+
+Base URL `https://cambill.cubis.tech`. Send your key in `X-API-Key`. The machine-readable description is [openapi.yaml](https://cambill.cubis.tech/v1/openapi.yaml). Amounts are integers in the minor unit. Errors are [problem+json](/docs/errors).
+
+## Payment intents
+
+### Create a payment intent
+
+`POST /v1/payment-intents`
+
+Idempotent on `external_id`. When the Bakong connector is on, the response carries a validated `qr_string`.
+
+| Field | Type | Required | |
+| --- | --- | --- | --- |
+| `amount` | integer | yes | Minor units |
+| `currency` | `USD` \| `KHR` | yes |  |
+| `external_id` | string |  |  |
+| `customer_id` | string |  |  |
+| `description` | string |  |  |
+| `metadata` | string |  |  |
+| `expires_in` | integer |  | Minutes |
+
+Returns `201` created. Errors: `400`, `401`, `409`, `429`.
+
+### Retrieve a payment intent
+
+`GET /v1/payment-intents/{id}`
+
+| Parameter | In | Type | |
+| --- | --- | --- | --- |
+| `id` | path | string |  |
+
+Returns `200` ok. Errors: `404`.
+
+### Retrieve only a payment intent's status
+
+`GET /v1/payment-intents/{id}/status`
+
+The cheapest read, for polling. It has its own, larger rate budget and does not sync with the bank.
+
+| Parameter | In | Type | |
+| --- | --- | --- | --- |
+| `id` | path | string |  |
+
+Returns `200` ok. Errors: `404`.
+
+## Invoices
+
+### Create a draft invoice
+
+`POST /v1/invoices`
+
+Idempotent on `external_id`.
+
+| Field | Type | Required | |
+| --- | --- | --- | --- |
+| `external_id` | string |  |  |
+| `customer` | string |  | A saved customer's id. Their name, email and phone are copied onto the invoice. |
+| `customer_external_id` | string |  | Or your own id for a saved customer. |
+| `customer_name` | string |  |  |
+| `customer_email` | string |  |  |
+| `customer_phone` | string |  |  |
+| `customer_tax_id` | string |  | Copied from the saved customer when you send `customer`. |
+| `currency` | `USD` \| `KHR` | yes |  |
+| `lines` | object[] | yes |  |
+| `memo` | string |  |  |
+| `due_in_days` | integer |  |  |
+| `coupon` | string |  | A coupon id or code. It must qualify now and is used up when the invoice is issued (the rules are checked again then). An unknown id or code answers 400. |
+| `metadata` | object |  | Up to 20 keys (`a-z 0-9 _ . -`, 40 characters); values are plain text up to 500 characters. |
+
+Returns `201` created. Errors: `400`, `403`, `409`.
+
+### Retrieve an invoice
+
+`GET /v1/invoices/{inv}`
+
+| Parameter | In | Type | |
+| --- | --- | --- | --- |
+| `inv` | path | string |  |
+| `expand` | query | `customer` | Include the saved customer |
+
+Returns `200` ok. Errors: `404`.
+
+### Replace a draft
+
+`PUT /v1/invoices/{inv}`
+
+| Parameter | In | Type | |
+| --- | --- | --- | --- |
+| `inv` | path | string |  |
+
+| Field | Type | Required | |
+| --- | --- | --- | --- |
+| `external_id` | string |  |  |
+| `customer` | string |  | A saved customer's id. Their name, email and phone are copied onto the invoice. |
+| `customer_external_id` | string |  | Or your own id for a saved customer. |
+| `customer_name` | string |  |  |
+| `customer_email` | string |  |  |
+| `customer_phone` | string |  |  |
+| `customer_tax_id` | string |  | Copied from the saved customer when you send `customer`. |
+| `currency` | `USD` \| `KHR` | yes |  |
+| `lines` | object[] | yes |  |
+| `memo` | string |  |  |
+| `due_in_days` | integer |  |  |
+| `coupon` | string |  | A coupon id or code. It must qualify now and is used up when the invoice is issued (the rules are checked again then). An unknown id or code answers 400. |
+| `metadata` | object |  | Up to 20 keys (`a-z 0-9 _ . -`, 40 characters); values are plain text up to 500 characters. |
+
+Returns `200` ok. Errors: `409`.
+
+### Delete a draft
+
+`DELETE /v1/invoices/{inv}`
+
+An issued invoice is voided, never deleted.
+
+| Parameter | In | Type | |
+| --- | --- | --- | --- |
+| `inv` | path | string |  |
+
+Returns `204` deleted. Errors: `409`.
+
+### Issue an invoice
+
+`POST /v1/invoices/{inv}/finalize`
+
+Gives it a number and a link. Repeating it changes nothing. In live mode the business must be verified.
+
+| Parameter | In | Type | |
+| --- | --- | --- | --- |
+| `inv` | path | string |  |
+
+Returns `200` ok. Errors: `403`, `422`, `429`.
+
+### Void an invoice
+
+`POST /v1/invoices/{inv}/void`
+
+| Parameter | In | Type | |
+| --- | --- | --- | --- |
+| `inv` | path | string |  |
+
+Returns `200` ok. Errors: `409`.
+
+### Copy an invoice into a new draft
+
+`POST /v1/invoices/{inv}/duplicate`
+
+| Parameter | In | Type | |
+| --- | --- | --- | --- |
+| `inv` | path | string |  |
+
+Returns `201` created.
+
+### An invoice's activity
+
+`GET /v1/invoices/{inv}/events`
+
+| Parameter | In | Type | |
+| --- | --- | --- | --- |
+| `inv` | path | string |  |
+| `page` | query | integer |  |
+| `limit` | query | integer |  |
+
+Returns `200` ok.
+
+### The invoice as its page shows it
+
+`GET /v1/invoices/{inv}/document`
+
+| Parameter | In | Type | |
+| --- | --- | --- | --- |
+| `inv` | path | string |  |
+
+Returns `200` ok.
+
+## Customers
+
+### Create a customer
+
+`POST /v1/customers`
+
+`external_id` is your own id for them (a user or CRM id). It must be unique; a second create with it is `409`.
+
+| Field | Type | Required | |
+| --- | --- | --- | --- |
+| `external_id` | string |  | Your own id; letters, digits and _ . : @ - |
+| `name` | string |  |  |
+| `email` | string |  |  |
+| `phone` | string |  | Digits, optionally starting with +, 6 to 15 long |
+| `tax_id` | string |  | Their tax registration number (VAT TIN), printed on their invoices. |
+| `metadata` | object |  | Up to 20 keys (`a-z 0-9 _ . -`, 40 characters); values are plain text up to 500 characters. |
+
+Returns `201` created. Errors: `400`, `403`, `409`.
+
+### List customers
+
+`GET /v1/customers`
+
+| Parameter | In | Type | |
+| --- | --- | --- | --- |
+| `page` | query | integer |  |
+| `limit` | query | integer |  |
+| `external_id` | query | string | Exact match on your own id |
+| `email` | query | string | Exact match |
+| `q` | query | string | Prefix search on id, external id, name, email and phone |
+
+Returns `200` ok.
+
+### Retrieve a customer
+
+`GET /v1/customers/{cus}`
+
+| Parameter | In | Type | |
+| --- | --- | --- | --- |
+| `cus` | path | string |  |
+
+Returns `200` ok. Errors: `404`.
+
+### Replace a customer's details
+
+`PUT /v1/customers/{cus}`
+
+| Parameter | In | Type | |
+| --- | --- | --- | --- |
+| `cus` | path | string |  |
+
+| Field | Type | Required | |
+| --- | --- | --- | --- |
+| `external_id` | string |  | Your own id; letters, digits and _ . : @ - |
+| `name` | string |  |  |
+| `email` | string |  |  |
+| `phone` | string |  | Digits, optionally starting with +, 6 to 15 long |
+| `tax_id` | string |  | Their tax registration number (VAT TIN), printed on their invoices. |
+| `metadata` | object |  | Up to 20 keys (`a-z 0-9 _ . -`, 40 characters); values are plain text up to 500 characters. |
+
+Returns `200` ok. Errors: `404`, `409`.
+
+### Erase a customer
+
+`DELETE /v1/customers/{cus}`
+
+Erases their personal data (name, email, phone, metadata, external id). The id stays, so invoices that name it still read. An issued invoice keeps its own copy of the name, because an invoice is a financial record.
+
+| Parameter | In | Type | |
+| --- | --- | --- | --- |
+| `cus` | path | string |  |
+
+Returns `204` erased. Errors: `404`.
+
+## Products
+
+### Create a product
+
+`POST /v1/products`
+
+| Field | Type | Required | |
+| --- | --- | --- | --- |
+| `name` | string | yes |  |
+| `description` | string |  |  |
+| `external_id` | string |  |  |
+| `active` | boolean |  | Archive a product with false. |
+| `metadata` | object |  | Up to 20 keys (`a-z 0-9 _ . -`, 40 characters); values are plain text up to 500 characters. |
+
+Returns `201` created. Errors: `400`, `403`.
+
+### List products
+
+`GET /v1/products`
+
+| Parameter | In | Type | |
+| --- | --- | --- | --- |
+| `page` | query | integer |  |
+| `limit` | query | integer |  |
+| `q` | query | string | Prefix search |
+| `active` | query | boolean |  |
+
+Returns `200` ok.
+
+### Retrieve a product
+
+`GET /v1/products/{prod}`
+
+| Parameter | In | Type | |
+| --- | --- | --- | --- |
+| `prod` | path | string |  |
+
+Returns `200` ok. Errors: `404`.
+
+### Update a product
+
+`PUT /v1/products/{prod}`
+
+| Parameter | In | Type | |
+| --- | --- | --- | --- |
+| `prod` | path | string |  |
+
+| Field | Type | Required | |
+| --- | --- | --- | --- |
+| `name` | string | yes |  |
+| `description` | string |  |  |
+| `external_id` | string |  |  |
+| `active` | boolean |  | Archive a product with false. |
+| `metadata` | object |  | Up to 20 keys (`a-z 0-9 _ . -`, 40 characters); values are plain text up to 500 characters. |
+
+Returns `200` ok. Errors: `400`, `404`.
+
+## Prices
+
+### Create a price
+
+`POST /v1/prices`
+
+A price's amount never changes. To charge a different amount, create a new price and archive the old one.
+
+| Field | Type | Required | |
+| --- | --- | --- | --- |
+| `product` | string | yes |  |
+| `currency` | `USD` \| `KHR` | yes |  |
+| `unit_amount` | integer | yes | Minor units |
+| `type` | `one_time` \| `recurring` |  |  |
+| `interval` | `day` \| `week` \| `month` \| `year` |  | Required for recurring |
+| `interval_count` | integer |  |  |
+| `nickname` | string |  |  |
+| `metadata` | object |  | Up to 20 keys (`a-z 0-9 _ . -`, 40 characters); values are plain text up to 500 characters. |
+
+Returns `201` created. Errors: `400`, `403`.
+
+### List prices
+
+`GET /v1/prices`
+
+| Parameter | In | Type | |
+| --- | --- | --- | --- |
+| `page` | query | integer |  |
+| `limit` | query | integer |  |
+| `q` | query | string | Prefix search |
+| `active` | query | boolean |  |
+| `product` | query | string |  |
+| `type` | query | `one_time` \| `recurring` |  |
+
+Returns `200` ok.
+
+### Retrieve a price
+
+`GET /v1/prices/{price}`
+
+| Parameter | In | Type | |
+| --- | --- | --- | --- |
+| `price` | path | string |  |
+
+Returns `200` ok. Errors: `404`.
+
+### Update a price
+
+`PUT /v1/prices/{price}`
+
+| Parameter | In | Type | |
+| --- | --- | --- | --- |
+| `price` | path | string |  |
+
+| Field | Type | Required | |
+| --- | --- | --- | --- |
+| `active` | boolean |  |  |
+| `nickname` | string |  |  |
+| `metadata` | object |  | Up to 20 keys (`a-z 0-9 _ . -`, 40 characters); values are plain text up to 500 characters. |
+
+Returns `200` ok. Errors: `400`, `404`.
+
+## Coupons
+
+### Create a coupon
+
+`POST /v1/coupons`
+
+| Field | Type | Required | |
+| --- | --- | --- | --- |
+| `name` | string | yes |  |
+| `code` | string |  | What a customer or you type to use it. Stored in capitals, unique. A coupon can also be named by its id. |
+| `percent_bps` | integer |  | 1000 = 10% |
+| `amount_off` | integer |  | Minor units |
+| `currency` | `USD` \| `KHR` |  |  |
+| `duration` | `once` \| `forever` \| `repeating` |  |  |
+| `duration_months` | integer |  |  |
+| `max_redemptions` | integer |  | 0 means no limit |
+| `redeem_by` | string |  |  |
+| `min_subtotal` | integer |  | Minor units; needs currency. The invoice must reach it before discount. |
+| `products` | string[] |  | Only lines for these products are discounted. Leave out for all lines. |
+| `max_per_customer` | integer |  | 0 means no limit. Needs a saved customer on the invoice. |
+| `first_time_only` | boolean |  | Only for a customer with no issued invoice yet. Needs a saved customer. |
+| `starts_at` | string |  |  |
+
+Returns `201` created. Errors: `400`, `403`.
+
+### List coupons
+
+`GET /v1/coupons`
+
+| Parameter | In | Type | |
+| --- | --- | --- | --- |
+| `page` | query | integer |  |
+| `limit` | query | integer |  |
+| `q` | query | string | Prefix search |
+| `active` | query | boolean |  |
+
+Returns `200` ok.
+
+### Retrieve a coupon
+
+`GET /v1/coupons/{cpn}`
+
+| Parameter | In | Type | |
+| --- | --- | --- | --- |
+| `cpn` | path | string |  |
+
+Returns `200` ok. Errors: `404`.
+
+### Update a coupon
+
+`PUT /v1/coupons/{cpn}`
+
+| Parameter | In | Type | |
+| --- | --- | --- | --- |
+| `cpn` | path | string |  |
+
+| Field | Type | Required | |
+| --- | --- | --- | --- |
+| `name` | string |  |  |
+| `active` | boolean |  |  |
+| `max_redemptions` | integer |  | 0 for no limit. Cannot go below the times it was used. |
+| `redeem_by` | string |  | Must be in the future. |
+| `clear_redeem_by` | boolean |  | Remove the redeem_by date. |
+| `code` | string |  |  |
+| `min_subtotal` | integer |  |  |
+| `products` | string[] |  |  |
+| `max_per_customer` | integer |  |  |
+| `first_time_only` | boolean |  |  |
+| `starts_at` | string |  |  |
+| `clear_starts_at` | boolean |  |  |
+
+Returns `200` ok. Errors: `400`, `404`.
+
+### List a coupon's redemptions
+
+`GET /v1/coupons/{cpn}/redemptions`
+
+The issued invoices that used the coupon, newest first.
+
+| Parameter | In | Type | |
+| --- | --- | --- | --- |
+| `cpn` | path | string |  |
+| `page` | query | integer |  |
+| `limit` | query | integer |  |
+
+Returns `200` ok. Errors: `404`.
+
+## Tax rates
+
+### Create a taxrate
+
+`POST /v1/tax_rates`
+
+A rate's percentage and whether it is inclusive never change. Create a new rate and archive the old one.
+
+| Field | Type | Required | |
+| --- | --- | --- | --- |
+| `name` | string | yes |  |
+| `percent_bps` | integer | yes | 1000 = 10% |
+| `inclusive` | boolean |  | The price already includes this tax |
+| `is_default` | boolean |  | Applied to lines that name no tax |
+
+Returns `201` created. Errors: `400`, `403`.
+
+### List taxrates
+
+`GET /v1/tax_rates`
+
+| Parameter | In | Type | |
+| --- | --- | --- | --- |
+| `page` | query | integer |  |
+| `limit` | query | integer |  |
+| `q` | query | string | Prefix search |
+| `active` | query | boolean |  |
+
+Returns `200` ok.
+
+### Retrieve a taxrate
+
+`GET /v1/tax_rates/{txr}`
+
+| Parameter | In | Type | |
+| --- | --- | --- | --- |
+| `txr` | path | string |  |
+
+Returns `200` ok. Errors: `404`.
+
+### Update a taxrate
+
+`PUT /v1/tax_rates/{txr}`
+
+| Parameter | In | Type | |
+| --- | --- | --- | --- |
+| `txr` | path | string |  |
+
+| Field | Type | Required | |
+| --- | --- | --- | --- |
+| `name` | string |  |  |
+| `percent_bps` | integer |  | Two decimals: 1000 is 10%. |
+| `inclusive` | boolean |  |  |
+| `active` | boolean |  |  |
+| `is_default` | boolean |  |  |
+
+Returns `200` ok. Errors: `400`, `404`.
+
+### Delete a tax rate
+
+`DELETE /v1/tax_rates/{txr}`
+
+Only a rate no invoice was charged with. A rate that was used answers 409; archive it instead.
+
+| Parameter | In | Type | |
+| --- | --- | --- | --- |
+| `txr` | path | string |  |
+
+Returns `204` deleted. Errors: `404`, `409`.
+
+## Subscriptions
+
+### Subscribe a customer to recurring prices
+
+`POST /v1/subscriptions`
+
+Bills the customer by invoice each period, in advance. The first invoice is created now; each is issued automatically unless `auto_issue` is false. Nothing is charged: the customer pays each invoice from its link. All items must share one currency and billing interval.
+
+| Field | Type | Required | |
+| --- | --- | --- | --- |
+| `customer` | string |  |  |
+| `customer_external_id` | string |  |  |
+| `items` | object[] |  |  |
+| `days_until_due` | integer |  |  |
+| `auto_issue` | boolean |  | Issue each invoice as it is created |
+| `cancel_at_period_end` | boolean |  |  |
+| `coupon` | string |  | A coupon id or code, on create. It discounts the periods its duration covers (once, N months, forever) and is used up once, by the first invoice. |
+| `metadata` | object |  | Up to 20 keys (`a-z 0-9 _ . -`, 40 characters); values are plain text up to 500 characters. |
+
+Returns `201` created. Errors: `400`, `403`.
+
+### List subscriptions
+
+`GET /v1/subscriptions`
+
+Filters combine (all must match). An id or external id that matches nothing gives an empty list, not an error.
+
+| Parameter | In | Type | |
+| --- | --- | --- | --- |
+| `page` | query | integer |  |
+| `limit` | query | integer |  |
+| `customer` | query | string | A customer's CamBill id. |
+| `customer_external_id` | query | string | Your own id for the customer. |
+| `product` | query | string | A product's CamBill id: subscriptions with an item for any of its prices. |
+| `product_external_id` | query | string | Your own id for the product. The usual way for another system to pull its subscriptions. |
+| `price` | query | string |  |
+| `coupon` | query | string | A coupon id or code |
+| `status` | query | `active` \| `paused` \| `canceled` |  |
+| `expand` | query | `customer` \| `items` \| `customer,items` | `customer` and/or `items`: the same full object webhooks carry (`customer_details`, and items with their price and product). |
+
+Returns `200` ok.
+
+### Retrieve a subscription
+
+`GET /v1/subscriptions/{sub}`
+
+| Parameter | In | Type | |
+| --- | --- | --- | --- |
+| `sub` | path | string |  |
+| `expand` | query | `customer` \| `items` \| `customer,items` | `customer` and/or `items`: the same full object webhooks carry (`customer_details`, and items with their price and product). |
+
+Returns `200` ok. Errors: `404`.
+
+### Change what happens from the next period
+
+`PUT /v1/subscriptions/{sub}`
+
+| Parameter | In | Type | |
+| --- | --- | --- | --- |
+| `sub` | path | string |  |
+
+| Field | Type | Required | |
+| --- | --- | --- | --- |
+| `customer` | string |  |  |
+| `customer_external_id` | string |  |  |
+| `items` | object[] |  |  |
+| `days_until_due` | integer |  |  |
+| `auto_issue` | boolean |  | Issue each invoice as it is created |
+| `cancel_at_period_end` | boolean |  |  |
+| `coupon` | string |  | A coupon id or code, on create. It discounts the periods its duration covers (once, N months, forever) and is used up once, by the first invoice. |
+| `metadata` | object |  | Up to 20 keys (`a-z 0-9 _ . -`, 40 characters); values are plain text up to 500 characters. |
+
+Returns `200` ok. Errors: `409`.
+
+### Pause billing
+
+`POST /v1/subscriptions/{sub}/pause`
+
+| Parameter | In | Type | |
+| --- | --- | --- | --- |
+| `sub` | path | string |  |
+
+Returns `200` ok. Errors: `409`.
+
+### Resume billing from now
+
+`POST /v1/subscriptions/{sub}/resume`
+
+Periods missed while paused are not billed. The first invoice is created now.
+
+| Parameter | In | Type | |
+| --- | --- | --- | --- |
+| `sub` | path | string |  |
+
+Returns `200` ok. Errors: `409`.
+
+### Cancel now, or at the end of the period
+
+`POST /v1/subscriptions/{sub}/cancel`
+
+| Parameter | In | Type | |
+| --- | --- | --- | --- |
+| `sub` | path | string |  |
+
+| Field | Type | Required | |
+| --- | --- | --- | --- |
+| `at_period_end` | boolean |  |  |
+
+Returns `200` ok. Errors: `409`.
+
+### Bill the next period now (test mode only)
+
+`POST /v1/subscriptions/{sub}/advance`
+
+Lets you test your integration without waiting a month. Answers 403 with a live key.
+
+| Parameter | In | Type | |
+| --- | --- | --- | --- |
+| `sub` | path | string |  |
+
+Returns `200` ok. Errors: `403`, `409`.
+
+## Objects
+
+### Product
+
+| Field | Type | Required | |
+| --- | --- | --- | --- |
+| `id` | string |  |  |
+| `object` | string |  |  |
+| `name` | string |  |  |
+| `description` | string |  |  |
+| `external_id` | string |  |  |
+| `active` | boolean |  |  |
+| `prices` | object[] |  | The active prices. Only in the product list. |
+| `metadata` | object |  | Up to 20 keys (`a-z 0-9 _ . -`, 40 characters); values are plain text up to 500 characters. |
+| `created_at` | string |  |  |
+| `updated_at` | string |  |  |
+
+### Price
+
+| Field | Type | Required | |
+| --- | --- | --- | --- |
+| `id` | string |  |  |
+| `object` | string |  |  |
+| `product` | string |  |  |
+| `currency` | string |  |  |
+| `unit_amount` | integer |  |  |
+| `type` | `one_time` \| `recurring` |  |  |
+| `recurring` | object or null |  |  |
+| `nickname` | string |  |  |
+| `active` | boolean |  |  |
+| `metadata` | object |  | Up to 20 keys (`a-z 0-9 _ . -`, 40 characters); values are plain text up to 500 characters. |
+| `created_at` | string |  |  |
+
+### Coupon
+
+| Field | Type | Required | |
+| --- | --- | --- | --- |
+| `id` | string |  |  |
+| `object` | string |  |  |
+| `name` | string |  |  |
+| `percent_bps` | integer |  |  |
+| `amount_off` | integer |  |  |
+| `currency` | string |  |  |
+| `duration` | string |  |  |
+| `duration_months` | integer |  |  |
+| `max_redemptions` | integer |  |  |
+| `times_redeemed` | integer |  |  |
+| `active` | boolean |  |  |
+| `redeem_by` | string or null |  |  |
+| `starts_at` | string or null |  |  |
+| `code` | string |  |  |
+| `min_subtotal` | integer |  |  |
+| `products` | string[] |  |  |
+| `max_per_customer` | integer |  |  |
+| `first_time_only` | boolean |  |  |
+| `created_at` | string |  |  |
+
+### TaxRate
+
+| Field | Type | Required | |
+| --- | --- | --- | --- |
+| `id` | string |  |  |
+| `object` | string |  |  |
+| `name` | string |  |  |
+| `percent_bps` | integer |  |  |
+| `inclusive` | boolean |  |  |
+| `active` | boolean |  |  |
+| `is_default` | boolean |  |  |
+| `created_at` | string |  |  |
+
+### Subscription
+
+| Field | Type | Required | |
+| --- | --- | --- | --- |
+| `id` | string |  |  |
+| `object` | string |  |  |
+| `mode` | `test` \| `live` |  |  |
+| `customer` | string |  |  |
+| `coupon` | object or null |  |  |
+| `status` | `active` \| `paused` \| `canceled` |  |  |
+| `items` | object[] |  | With expand, and in webhooks, each item also carries its price details and product. |
+| `currency` | string |  |  |
+| `interval` | string |  |  |
+| `interval_count` | integer |  |  |
+| `current_period_start` | string or null |  |  |
+| `current_period_end` | string or null |  |  |
+| `next_invoice_at` | string or null |  |  |
+| `days_until_due` | integer |  |  |
+| `auto_issue` | boolean |  |  |
+| `cancel_at_period_end` | boolean |  |  |
+| `latest_invoice` | object or null |  |  |
+| `customer_details` | object |  | With expand, and in webhooks. |
+| `previous_attributes` | object |  | In subscription.* change events: the old values of what changed. |
+| `past_due` | boolean |  | The latest invoice is open and past its due date |
+| `last_error` | string |  | Why the last invoice could not be issued |
+| `metadata` | object |  | Up to 20 keys (`a-z 0-9 _ . -`, 40 characters); values are plain text up to 500 characters. |
+| `created_at` | string |  |  |
+| `canceled_at` | string or null |  |  |
+
+### Customer
+
+| Field | Type | Required | |
+| --- | --- | --- | --- |
+| `id` | string |  |  |
+| `object` | string |  |  |
+| `mode` | `test` \| `live` |  |  |
+| `external_id` | string |  |  |
+| `name` | string |  |  |
+| `email` | string |  |  |
+| `phone` | string |  |  |
+| `tax_id` | string |  |  |
+| `metadata` | object |  | Up to 20 keys (`a-z 0-9 _ . -`, 40 characters); values are plain text up to 500 characters. |
+| `created_at` | string |  |  |
+| `updated_at` | string |  |  |
+
+### PaymentIntent
+
+| Field | Type | Required | |
+| --- | --- | --- | --- |
+| `id` | string |  |  |
+| `object` | string |  |  |
+| `mode` | `test` \| `live` |  |  |
+| `amount` | integer |  |  |
+| `currency` | string |  |  |
+| `status` | `requires_payment_method` \| `succeeded` \| `expired` |  |  |
+| `external_id` | string |  |  |
+| `client_secret` | string |  |  |
+| `payment_link` | string |  |  |
+| `qr_string` | string |  | A validated Bakong KHQR |
+| `qr_method` | string |  |  |
+| `qr_expires_at` | string |  |  |
+| `created_at` | string |  |  |
+| `expires_at` | string |  |  |
+| `settled_at` | string or null |  |  |
+
+### Invoice
+
+| Field | Type | Required | |
+| --- | --- | --- | --- |
+| `id` | string |  |  |
+| `object` | string |  |  |
+| `mode` | `test` \| `live` |  |  |
+| `number` | string |  | INV-000123, given when issued |
+| `status` | `draft` \| `open` \| `paid` \| `void` |  |  |
+| `currency` | string |  |  |
+| `subtotal` | integer |  | Sum of the lines before discount and tax |
+| `discount_total` | integer |  |  |
+| `tax_total` | integer |  | All tax |
+| `total` | integer |  | subtotal - discount_total + exclusive tax |
+| `tax_breakdown` | object[] |  |  |
+| `coupon` | object or null |  |  |
+| `tax_id` | string |  | The business's tax registration number |
+| `subscription` | string |  | The subscription this invoice bills |
+| `period_start` | string or null |  | Start of the billed period |
+| `period_end` | string or null |  | End of the billed period (the next period starts here) |
+| `lines` | object[] |  |  |
+| `memo` | string |  |  |
+| `metadata` | object |  | Up to 20 keys (`a-z 0-9 _ . -`, 40 characters); values are plain text up to 500 characters. |
+| `customer_id` | string |  |  |
+| `customer` | object or null |  | Only with `?expand=customer`. |
+| `customer_name` | string |  |  |
+| `customer_email` | string |  |  |
+| `customer_phone` | string |  |  |
+| `customer_tax_id` | string |  |  |
+| `external_id` | string |  |  |
+| `hosted_invoice_url` | string |  | The payer's page; present once issued |
+| `payment_intent_id` | string |  |  |
+| `suspended` | boolean |  |  |
+| `reports` | integer |  |  |
+| `created_at` | string |  |  |
+| `due_at` | string or null |  |  |
+| `finalized_at` | string or null |  |  |
+| `paid_at` | string or null |  |  |
+
+### ActivityEvent
+
+| Field | Type | Required | |
+| --- | --- | --- | --- |
+| `id` | string |  |  |
+| `source` | `invoice` \| `payment` |  |  |
+| `type` | string |  |  |
+| `actor_type` | string |  |  |
+| `details` | object |  |  |
+| `created_at` | string |  |  |
