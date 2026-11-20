@@ -656,6 +656,7 @@ Returns `200` ok. Errors: `403`, `409`.
 | --- | --- | --- | --- |
 | `id` | string |  |  |
 | `object` | string |  |  |
+| `mode` | `test` \| `live` |  |  |
 | `name` | string |  |  |
 | `description` | string |  |  |
 | `external_id` | string |  |  |
@@ -671,6 +672,7 @@ Returns `200` ok. Errors: `403`, `409`.
 | --- | --- | --- | --- |
 | `id` | string |  |  |
 | `object` | string |  |  |
+| `mode` | `test` \| `live` |  |  |
 | `product` | string |  |  |
 | `currency` | string |  |  |
 | `unit_amount` | integer |  |  |
@@ -687,6 +689,7 @@ Returns `200` ok. Errors: `403`, `409`.
 | --- | --- | --- | --- |
 | `id` | string |  |  |
 | `object` | string |  |  |
+| `mode` | `test` \| `live` |  |  |
 | `name` | string |  |  |
 | `percent_bps` | integer |  |  |
 | `amount_off` | integer |  |  |
@@ -711,6 +714,7 @@ Returns `200` ok. Errors: `403`, `409`.
 | --- | --- | --- | --- |
 | `id` | string |  |  |
 | `object` | string |  |  |
+| `mode` | `test` \| `live` |  |  |
 | `name` | string |  |  |
 | `percent_bps` | integer |  |  |
 | `inclusive` | boolean |  |  |
@@ -774,6 +778,12 @@ Returns `200` ok. Errors: `403`, `409`.
 | `currency` | string |  |  |
 | `status` | `requires_payment_method` \| `succeeded` \| `expired` |  |  |
 | `external_id` | string |  |  |
+| `customer_id` | string |  |  |
+| `description` | string |  |  |
+| `metadata` | string |  | The free text you sent on create |
+| `bank_provider` | string |  | The method that settled it; empty until paid |
+| `bank_tx_id` | string |  | The bank's reference; empty until paid |
+| `receipt_no` | string |  | Set when it settles, e.g. RC-20261120-D2KWSH3Q |
 | `client_secret` | string |  |  |
 | `payment_link` | string |  |  |
 | `qr_string` | string |  | A validated Bakong KHQR |

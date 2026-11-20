@@ -22,6 +22,7 @@ You get back:
 | `qr_string` | Draw a Bakong KHQR yourself, when the Bakong connector is on. It is validated, and expires in 5 minutes (`qr_expires_at`). Create again with the same `external_id` for a fresh one. |
 | `client_secret` | Open the checkout from your own page. Treat it like a password. |
 | `status` | `requires_payment_method`, `succeeded` or `expired`. |
+| `bank_provider`, `bank_tx_id`, `receipt_no`, `settled_at` | Empty until it settles: the method that paid it, the bank's reference, the receipt number and the time. |
 
 ## Know it is paid
 
