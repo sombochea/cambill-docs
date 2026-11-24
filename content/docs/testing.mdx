@@ -8,5 +8,14 @@ description: "Test mode, sample data, and a clock you can move."
 - **Sample data:** the dashboard's **Add sample data** (or `POST /v1/businesses/:id/sandbox/seed`) creates a customer, a product with a one-time and a monthly price, a tax rate and an issued invoice. Run it again for another invoice.
 - **Move the clock:** `subscriptions.advance(id)` bills the next period now.
 - **Retry safely:** send the same `Idempotency-Key` twice and you get the first response back.
+- **Test your webhook handler** without CamBill: sign a body with `signWebhook` and post it to your route.
+
+```ts
+import { signWebhook } from "@cubis/cambill"
+
+const body = JSON.stringify({ id: "evt_1", type: "invoice.paid", created_at: new Date().toISOString(), data: { id: "inv_test_1" } })
+const signature = await signWebhook(process.env.CAMBILL_WEBHOOK_SECRET!, Math.floor(Date.now() / 1000), body)
+await fetch("http://localhost:3000/api/cambill/webhook", { method: "POST", body, headers: { "x-cambill-signature": signature } })
+```
 
 Test mode has no invoice limits and does not need your business to be verified.

@@ -1,0 +1,217 @@
+---
+title: "Next.js, Remix, TanStack Start"
+description: "Two route files and one component: take payments and handle webhooks in your full-stack app."
+status: beta
+---
+
+`@cubis/cambill` ships route handlers for each framework. You write three small pieces:
+
+1. **A checkout route.** Your server decides the amount and creates the payment.
+2. **A webhook route.** CamBill tells your server when the payment settles.
+3. **The checkout component.** It calls your checkout route and shows the payment in your page.
+
+The API key and the webhook secret stay on your server. The browser only ever sees one payment's id and client secret.
+
+## Before you start
+
+```npm
+npm install @cubis/cambill
+```
+
+Put your keys in the environment. The handlers read these names, so you don't pass them in code:
+
+```bash title=".env"
+CAMBILL_API_KEY=khpay_test_…        # Dashboard → API & webhooks
+CAMBILL_WEBHOOK_SECRET=whsec_…      # the same page, after you add your endpoint
+```
+
+In the dashboard:
+
+- Turn on a connector (**Connectors → Bakong KHQR**, test mode).
+- Under **Checkout → Embed on your site**, list your site's origin (`http://localhost:3000` while developing).
+- Under **API & webhooks**, set your webhook URL to `https://your-site/api/cambill/webhook`.
+
+## Add it to your app
+
+<Tabs items={["Next.js", "Remix / React Router", "TanStack Start"]}>
+<Tab value="Next.js">
+
+**Checkout route.** Read what the customer is buying, look up the price yourself, and return the payment to create.
+
+```ts title="app/api/cambill/checkout/route.ts"
+import { checkout } from "@cubis/cambill/next"
+
+export const POST = checkout(async (request) => {
+  const { orderId } = await request.json()
+  const order = await db.orders.find(orderId) // your data, not the browser's
+  return { amount: order.total, currency: "USD", external_id: order.id }
+})
+```
+
+**Webhook route.** Name the events you care about. Each handler gets the event, typed.
+
+```ts title="app/api/cambill/webhook/route.ts"
+import { webhook } from "@cubis/cambill/next"
+
+export const POST = webhook({
+  "payment_intent.succeeded": async (event) => {
+    await db.orders.markPaid(event.data.external_id!)
+  },
+})
+```
+
+**The page.** You can render the component from a server component. To pass callbacks such as `onSuccess`, render it from a `"use client"` component instead.
+
+```tsx title="app/orders/[id]/pay/page.tsx"
+import { CamBillCheckout } from "@cubis/cambill/react"
+
+export default async function Pay({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
+  return <CamBillCheckout endpoint="/api/cambill/checkout" body={{ orderId: id }} />
+}
+```
+
+</Tab>
+<Tab value="Remix / React Router">
+
+Works with Remix 2 and React Router 7: both pass `{ request }` to an `action`.
+
+**Checkout route.**
+
+```ts title="app/routes/api.cambill.checkout.ts"
+import { checkout } from "@cubis/cambill/remix"
+
+export const action = checkout(async (request) => {
+  const { orderId } = await request.json()
+  const order = await db.orders.find(orderId) // your data, not the browser's
+  return { amount: order.total, currency: "USD", external_id: order.id }
+})
+```
+
+**Webhook route.**
+
+```ts title="app/routes/api.cambill.webhook.ts"
+import { webhook } from "@cubis/cambill/remix"
+
+export const action = webhook({
+  "payment_intent.succeeded": async (event) => {
+    await db.orders.markPaid(event.data.external_id!)
+  },
+})
+```
+
+**The page.**
+
+```tsx title="app/routes/orders.$id.pay.tsx"
+import { useParams } from "react-router"
+import { CamBillCheckout } from "@cubis/cambill/react"
+
+export default function Pay() {
+  const { id } = useParams()
+  return <CamBillCheckout endpoint="/api/cambill/checkout" body={{ orderId: id }} />
+}
+```
+
+</Tab>
+<Tab value="TanStack Start">
+
+Server routes pass `{ request }` to each method handler.
+
+**Checkout route.**
+
+```ts title="src/routes/api/cambill/checkout.ts"
+import { createFileRoute } from "@tanstack/react-router"
+import { checkout } from "@cubis/cambill/tanstack-start"
+
+export const Route = createFileRoute("/api/cambill/checkout")({
+  server: {
+    handlers: {
+      POST: checkout(async (request) => {
+        const { orderId } = await request.json()
+        const order = await db.orders.find(orderId) // your data, not the browser's
+        return { amount: order.total, currency: "USD", external_id: order.id }
+      }),
+    },
+  },
+})
+```
+
+**Webhook route.**
+
+```ts title="src/routes/api/cambill/webhook.ts"
+import { createFileRoute } from "@tanstack/react-router"
+import { webhook } from "@cubis/cambill/tanstack-start"
+
+export const Route = createFileRoute("/api/cambill/webhook")({
+  server: {
+    handlers: {
+      POST: webhook({
+        "payment_intent.succeeded": async (event) => {
+          await db.orders.markPaid(event.data.external_id!)
+        },
+      }),
+    },
+  },
+})
+```
+
+**The page.**
+
+```tsx title="src/routes/orders/$id.pay.tsx"
+import { createFileRoute } from "@tanstack/react-router"
+import { CamBillCheckout } from "@cubis/cambill/react"
+
+export const Route = createFileRoute("/orders/$id/pay")({
+  component: function Pay() {
+    const { id } = Route.useParams()
+    return <CamBillCheckout endpoint="/api/cambill/checkout" body={{ orderId: id }} />
+  },
+})
+```
+
+</Tab>
+</Tabs>
+
+That's the whole integration. Open the page and press **Simulate payment** on the test checkout: your webhook handler runs.
+
+## What the handlers do for you
+
+**`checkout(create)`**
+
+- Answers `POST` only, with `{ id, client_secret }` and nothing else from the payment.
+- Return `null` from `create` to answer `404` (an unknown order, say), or throw a `Response` to answer with it.
+- An API refusal keeps its status and title, like `400 Return URL Not Allowed`. Any other failure is a plain `500` with no detail, and is logged on your server.
+- Set `external_id`, and opening the checkout twice for one order returns the same payment, not a second one.
+
+**`webhook(handlers)`**
+
+- Checks the signature on the raw body, before anything is parsed.
+- Answers `400` to a bad or old signature (more than 5 minutes), `500` when your handler throws (so CamBill retries the delivery), and `204` otherwise, including for event types you don't handle.
+- A `"*"` handler runs for every event, after its own.
+- Deliveries can repeat and arrive out of order, so make handlers idempotent: `markPaid` on an order that's already paid should do nothing.
+
+See [Webhooks](/docs/webhooks) for every event and its `data`.
+
+## The component
+
+`CamBillCheckout` with `endpoint` POSTs `body` as JSON to your route (with the page's cookies), then shows the payment it gets back. `onSuccess`, `onExpired` and `onError` work as on the [widget](/docs/widget). `onError` reports `endpoint_failed` when your route doesn't answer `{ id, client_secret }`.
+
+<Callout type="warn" title="Ship only on the webhook">
+`onSuccess` runs in the browser, so anyone can fake it. Use it to show a thank-you message. Fulfil the order in your webhook handler.
+</Callout>
+
+Using Vue or Svelte? The same `endpoint` and `body` options work on their components. See [Widget](/docs/widget).
+
+## Other runtimes
+
+`@cubis/cambill/server` exports the same `checkout` and `webhook` as plain `(request: Request) => Promise<Response>`, for Hono, Bun, Deno, Cloudflare Workers or any server built on Web requests:
+
+```ts
+import { checkout, webhook } from "@cubis/cambill/server"
+
+const handleWebhook = webhook({ "invoice.paid": (e) => markInvoicePaid(e.data.id) })
+
+app.post("/api/cambill/webhook", (c) => handleWebhook(c.req.raw)) // Hono
+```
+
+Where there is no `process.env` (Workers), pass the keys yourself: `checkout(create, { apiKey })` and `webhook(handlers, { secret })`. Both also take a `CamBill` client you already have: `checkout(create, { cambill })`.

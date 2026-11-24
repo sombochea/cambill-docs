@@ -31,7 +31,7 @@ await cambill.subscriptions.update(id, { items: [/* … */], days_until_due: 7 }
 
 ## If an invoice cannot be issued
 
-Pausing and cancelling ask you to confirm first. A live-mode limit, an unverified business, or a feature turned off can stop an invoice from being issued. The invoice is kept as a **draft**, the subscription's `last_error` says why, and CamBill is alerted. A period is never skipped.
+A live-mode limit, an unverified business, or a feature turned off can stop an invoice from being issued. The invoice is kept as a **draft**, the subscription's `last_error` says why, and CamBill is alerted. A period is never skipped.
 
 ## Test without waiting
 

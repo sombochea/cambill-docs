@@ -7,9 +7,9 @@ const paths = [
     href: '/docs/quickstart',
   },
   {
-    title: 'Node SDK',
-    body: '@cubis/cambill: typed, zero dependencies, retries and idempotency built in.',
-    href: '/docs/sdk',
+    title: 'Next.js, Remix, TanStack Start',
+    body: 'Two route files and one component. Payments and webhooks in minutes.',
+    href: '/docs/frameworks',
   },
   {
     title: 'API reference',

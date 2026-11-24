@@ -183,6 +183,14 @@ If your site sets a Content Security Policy, add `frame-src https://cambill.cubi
 </Step>
 </Steps>
 
+### Or let the component call your server
+
+Pass `endpoint` (your route) and `body` in place of `intent` and `secret`. The component POSTs `body` as JSON, with your cookies, and opens the payment your route answers. `checkout()` from `@cubis/cambill/next` (or `/remix`, `/tanstack-start`) makes that route in a few lines. See [Frameworks](/docs/frameworks).
+
+```tsx
+<CamBillCheckout endpoint="/api/cambill/checkout" body={{ orderId: "1001" }} onSuccess={showThanks} />
+```
+
 ## Options and callbacks
 
 `CamBill.open` returns `{ close() }`.
@@ -190,6 +198,7 @@ If your site sets a Content Security Policy, add `frame-src https://cambill.cubi
 | Option | Use |
 | --- | --- |
 | `intent`, `secret` | The payment's `id` and `client_secret`. |
+| `endpoint`, `body`, `headers` | Instead of `intent` and `secret`: your route that answers `{ id, client_secret }`, and what to POST to it. A failure calls `onError` with `endpoint_failed`. |
 | `container` | A selector or element to render in. Omit for a modal. |
 | `layout` | `modal` (default), `sheet` (right drawer, a bottom sheet on phones), `bottom` or `inline` (needs `container`). Without it the widget uses the default set in Dashboard, Checkout, Widget layout. An unknown value opens the modal. |
 | `height` | 240 to 1400 px (default 480), kept until the frame reports its own size. |

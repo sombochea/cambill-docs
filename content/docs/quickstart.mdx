@@ -3,7 +3,11 @@ title: "Quickstart"
 description: "A customer, a product and an invoice your customer can pay, in five minutes."
 ---
 
-You will create a customer, sell a product, issue an invoice, watch it get paid, and start a subscription, all in test mode. The code here is run against a real stack on every change, so it works as written.
+In test mode, you'll create a customer, sell a product, issue an invoice, watch it get paid, and start a subscription. The code on this page runs against a real stack on every change, so it works as written.
+
+<Callout>
+Building on Next.js, Remix or TanStack Start and only need payments? Go to [Frameworks](/docs/frameworks): two route files and one component.
+</Callout>
 
 <Steps>
 <Step>
@@ -33,7 +37,8 @@ const cambill = new CamBill({ apiKey: process.env.CAMBILL_API_KEY! })
 // external_id is your own id for them.
 const customer = await cambill.customers.create({ external_id: "user_42", name: "Sok Dara", email: "sok@example.com" })
 
-const product = await cambill.products.create({ name: "Consulting day" })
+// external_id on the product is your own id for the plan.
+const product = await cambill.products.create({ name: "Consulting day", external_id: "plan_consulting" })
 const price = await cambill.prices.create({ product: product.id, currency: "USD", unit_amount: 5000 })
 ```
 
@@ -73,7 +78,12 @@ const paid = await cambill.invoices.retrieve(invoice.id)
 paid.status // "paid"
 ```
 
-In production, do not poll: handle the [`invoice.paid` webhook](/docs/webhooks).
+In production, don't poll. Handle the [`invoice.paid` webhook](/docs/webhooks) instead:
+
+```ts
+const event = await cambill.webhooks.constructEvent({ payload: rawBody, signature, secret: process.env.CAMBILL_WEBHOOK_SECRET! })
+if (event.type === "invoice.paid") console.log("paid:", event.data.id) // event.data is typed by event.type
+```
 
 </Step>
 <Step>
@@ -88,7 +98,11 @@ const subscription = await cambill.subscriptions.create({ customer: customer.id,
 await cambill.subscriptions.advance(subscription.id)
 ```
 
-Each period is an invoice; your customer pays each one from its link.
+Each period is an invoice, and your customer pays each one from its link. Find subscriptions by your own ids, so you never need to store CamBill's:
+
+```ts
+const mine = await cambill.subscriptions.list({ product_external_id: "plan_consulting", status: "active", expand: "customer,items" })
+```
 
 </Step>
 </Steps>
@@ -99,6 +113,7 @@ In the dashboard, **API & webhooks → Add sample data** creates a customer, a p
 
 ## Next
 
+- [Frameworks](/docs/frameworks): Next.js, Remix and TanStack Start.
 - [Webhooks](/docs/webhooks): get told when something happens.
 - [Conventions](/docs/conventions): idempotency, metadata, pagination.
 - [Going live](/docs/production).

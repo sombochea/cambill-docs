@@ -84,6 +84,19 @@ An id that matches nothing gives an empty list, not an error.
 
 Each request has an `X-Cambill-Signature: t=<unix>,v1=<hex>` header: an HMAC-SHA256 of `"<t>.<raw body>"` with your signing secret (`whsec_…`). Check it against the **raw body**, before parsing.
 
+On Next.js, Remix or TanStack Start, `webhook()` does all of it ([Frameworks](/docs/frameworks)):
+
+```ts
+// app/api/cambill/webhook/route.ts
+import { webhook } from "@cubis/cambill/next"
+
+export const POST = webhook({
+  "invoice.paid": (event) => markPaid(event.data.id), // reads CAMBILL_WEBHOOK_SECRET
+})
+```
+
+Anywhere else, call `constructEvent` yourself. With Express:
+
 ```ts
 import { constructEvent } from "@cubis/cambill"
 

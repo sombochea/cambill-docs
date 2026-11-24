@@ -1,5 +1,5 @@
 ---
-title: "Node SDK"
+title: "JavaScript SDK"
 description: "@cubis/cambill: typed, zero dependencies, retries and idempotency built in."
 ---
 
@@ -7,7 +7,21 @@ description: "@cubis/cambill: typed, zero dependencies, retries and idempotency 
 npm install @cubis/cambill
 ```
 
-Node 20+, Bun, Deno and Workers. Server only: the key is a secret.
+Node 20+, Bun, Deno and Workers. The client is server only, because the key is a secret.
+
+## What to import
+
+| Import | For |
+| --- | --- |
+| `@cubis/cambill` | The API client (`CamBill`), errors and webhook verification. |
+| `@cubis/cambill/next` | Next.js route handlers: `checkout` and `webhook`. See [Frameworks](/docs/frameworks). |
+| `@cubis/cambill/remix` | The same for Remix and React Router 7 actions. |
+| `@cubis/cambill/tanstack-start` | The same for TanStack Start server routes. |
+| `@cubis/cambill/server` | The same on plain `Request` → `Response`, for Hono, Bun, Deno and Workers. |
+| `@cubis/cambill/react`, `/vue`, `/svelte` | The checkout component for the browser. See [Widget](/docs/widget). |
+| `@cubis/cambill/widget` | `openCheckout`, without a framework. |
+
+## The client
 
 ```ts
 import { CamBill, CamBillError } from "@cubis/cambill"
@@ -33,7 +47,7 @@ const cambill = new CamBill({
 
 ## In the browser
 
-The checkout widget has components for React (`@cubis/cambill/react`), Vue (`/vue`) and Svelte (`/svelte`), and a framework-free `openCheckout` in `@cubis/cambill/widget`. They take the payment intent id and `client_secret` from your server, never an API key, and always load the current loader. See [Widget](/docs/widget).
+The checkout components take a payment's id and `client_secret` from your server, or an `endpoint` on your server that answers them. They never take an API key, and they always load the current loader. See [Widget](/docs/widget).
 
 ## Types
 

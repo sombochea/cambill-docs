@@ -32,7 +32,7 @@ Handle the `payment_intent.succeeded` [webhook](/docs/webhooks). To read the sta
 curl https://cambill.cubis.tech/v1/payment-intents/pi_test_… -H "X-API-Key: $CAMBILL_API_KEY"
 ```
 
-For polling, `GET /v1/payment-intents/{id}/status` returns only `{ id, status }`. It is one indexed read with its own budget (600 per minute per business, the rest share 100), and it does not ask the bank, so keep the webhook as your source of truth. With the SDK: `cambill.paymentIntents.status(id)`.
+For polling, `GET /v1/payment-intents/{id}/status` returns only `{ id, status }`. It is one indexed read with its own budget (600 a minute per business; other reads share 100), and it does not ask the bank, so keep the webhook as your source of truth. With the SDK: `cambill.paymentIntents.status(id)`.
 
 ## Bring the customer back
 
@@ -64,7 +64,7 @@ if (intent.status === "succeeded" && intent.external_id === "order_1001") fulfil
 
 ## Show it in your page
 
-Do not want a redirect? Open the checkout inside your own page with the [checkout widget](/docs/widget).
+Don't want a redirect? Open the checkout inside your own page with the [checkout widget](/docs/widget). On Next.js, Remix or TanStack Start, [Frameworks](/docs/frameworks) sets up the route and the component for you.
 
 ## Idempotent on `external_id`
 
