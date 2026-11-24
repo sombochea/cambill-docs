@@ -7,7 +7,7 @@ const paths = [
     href: '/docs/quickstart',
   },
   {
-    title: 'Next.js, Remix, TanStack Start',
+    title: 'Frameworks',
     body: 'Two route files and one component. Payments and webhooks in minutes.',
     href: '/docs/frameworks',
   },
