@@ -22,6 +22,8 @@ Idempotent on `external_id`. When the Bakong connector is on, the response carri
 | `description` | string |  |  |
 | `metadata` | string |  |  |
 | `expires_in` | integer |  | Minutes |
+| `success_url` | string |  | Where the payer returns after paying, on the hosted checkout and in the widget. https only, without credentials or a #fragment, and its origin must be listed in Checkout settings (return origins or embed origins), or the request fails with 400. The payer arrives with only `?payment_intent=<id>` added: read the status from the API or the webhook before fulfilling. |
+| `cancel_url` | string |  | Where the payer returns on cancel or expiry. Same rules as success_url. |
 
 Returns `201` created. Errors: `400`, `401`, `409`, `429`.
 
@@ -784,6 +786,8 @@ Returns `200` ok. Errors: `403`, `409`.
 | `bank_provider` | string |  | The method that settled it; empty until paid |
 | `bank_tx_id` | string |  | The bank's reference; empty until paid |
 | `receipt_no` | string |  | Set when it settles, e.g. RC-20261120-D2KWSH3Q |
+| `success_url` | string |  | As sent on create; omitted when unset |
+| `cancel_url` | string |  | As sent on create; omitted when unset |
 | `client_secret` | string |  |  |
 | `payment_link` | string |  |  |
 | `qr_string` | string |  | A validated Bakong KHQR |

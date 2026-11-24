@@ -19,6 +19,7 @@ Every event has the same envelope: `id` (unique, use it to ignore a repeat), `ty
 | `payment_intent.expired` | A payment intent expired unpaid. | the payment intent |
 | `invoice.finalized` | An invoice was issued. | the invoice |
 | `invoice.paid` | An invoice was paid (`paid_after_void` is true if you had just voided it). | the invoice |
+| `invoice.overpaid` | A second payment arrived for an invoice already paid (an older checkout finished late). The invoice stays paid; refund this payment. | the invoice, plus `overpayment` `{ payment_intent_id, amount, currency }` |
 | `invoice.voided` | An issued invoice was voided. | the invoice |
 | `customer.created`, `customer.updated` | A customer changed. | the customer |
 | `customer.deleted` | A customer was erased. | `{ id, object, deleted }` |

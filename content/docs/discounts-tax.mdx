@@ -34,7 +34,7 @@ All optional. One check decides them for the editor preview, the draft and issui
 | Minimum invoice | `min_subtotal` with `currency`, before discount |
 | Only some products | `products: [productId]`: only those lines are discounted |
 
-You can change a coupon's name, code, rules and limits later (`coupons.update`); what it takes off and for how long (`duration`) are fixed. Invoices already issued keep the discount they got.
+You can change a coupon's name, code, rules and limits later (`coupons.update`); what it takes off and for how long (`duration`) are fixed, and so are its `products` once it has been used (`409 Coupon In Use`: make a new coupon). Invoices already issued keep the discount they got. A "once" coupon on a subscription is redeemed by its first invoice only, whatever pauses and resumes follow.
 
 ### On subscriptions
 

@@ -24,7 +24,7 @@ All items must share one currency and one interval. The first invoice is created
 
 ```ts
 await cambill.subscriptions.pause(id)
-await cambill.subscriptions.resume(id) // restarts from now; missed periods are not billed
+await cambill.subscriptions.resume(id) // restarts when the period already billed ends (or now); missed periods are not billed, nothing is billed twice
 await cambill.subscriptions.cancel(id, { at_period_end: true }) // or now: cancel(id)
 await cambill.subscriptions.update(id, { items: [/* … */], days_until_due: 7 }) // from the next period
 ```
