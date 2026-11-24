@@ -34,6 +34,34 @@ curl https://cambill.cubis.tech/v1/payment-intents/pi_test_… -H "X-API-Key: $C
 
 For polling, `GET /v1/payment-intents/{id}/status` returns only `{ id, status }`. It is one indexed read with its own budget (600 per minute per business, the rest share 100), and it does not ask the bank, so keep the webhook as your source of truth. With the SDK: `cambill.paymentIntents.status(id)`.
 
+## Bring the customer back
+
+Send `success_url` and `cancel_url` on create. The hosted checkout returns the customer to `success_url` five seconds after paying, and offers `cancel_url` as "Cancel and return" while the payment is open and as "Return to …" once it expired. The [widget](/docs/widget) sends your page to the same URLs.
+
+```ts
+const intent = await cambill.paymentIntents.create({
+  amount: 1050,
+  currency: "USD",
+  external_id: "order_1001",
+  success_url: "https://shop.example.com/orders/1001/thanks",
+  cancel_url: "https://shop.example.com/cart",
+})
+```
+
+The rules keep these links yours:
+
+- **Allowlisted.** The URL's origin must be listed in Dashboard, Checkout, **Return origins** (the widget's **Embed** sites count too), or the create is `400 Return URL Not Allowed`. Removing an origin stops its links at once, on payments already created. A leaked API key cannot point your customers at another site.
+- **Strict.** `https://` only (`http://localhost` while developing), no credentials, no `#fragment`, at most 500 characters.
+- **Nothing to forge.** The customer arrives with only `?payment_intent=pi_…` added. Anyone can type that URL, so on that page read the payment before you fulfil:
+
+```ts
+// GET /orders/1001/thanks?payment_intent=pi_…
+const intent = await cambill.paymentIntents.retrieve(req.query.payment_intent)
+if (intent.status === "succeeded" && intent.external_id === "order_1001") fulfil()
+```
+
+- **Set by you only.** The checkout ignores any return address in its own link, and the URLs never carry the client secret (the checkout sends no `Referer`).
+
 ## Show it in your page
 
 Do not want a redirect? Open the checkout inside your own page with the [checkout widget](/docs/widget).
