@@ -21,6 +21,19 @@ Send your own 32-character hex `X-Trace-ID` to line CamBill's logs up with yours
 
 Without a date filter the list covers the last 7 days. Searching an id looks through everything still kept.
 
+## Who made each call
+
+Open a call to see who made it.
+
+| Caller | What you see |
+| --- | --- |
+| Your server | The API key's short fingerprint, with its IP address and user agent. |
+| Someone in your dashboard | Their account and sign-in session, with IP address and browser. |
+| A payer | A code such as `payer_9f2c41d07a6be315`, and no address or browser. |
+| CamBill itself | `system` and the job's name, such as `reconciler` or `webhook-worker`. |
+
+CamBill's call to a bank shows whoever caused it. A key that was refused shows its fingerprint too, so you can tell which key is failing.
+
 ## One payment, one trace
 
 A payment's later calls are filed under the trace of the request that created it: your reads of it, the payer's checkout steps, the bank's callback, CamBill's checks with the bank, and each webhook delivery. The timeline shows which call led to which.
@@ -54,7 +67,7 @@ Logging is a debugging aid. It never slows or fails your request, and under heav
 Values are cleaned before they are stored, so neither you nor CamBill can read them back.
 
 - **Secrets** (API keys, client secrets, tokens, signatures) show as `[REDACTED fp:1a2b3c4d]`. The same value always has the same fingerprint, so you can tell whether two requests used the same key. Passwords and card data have no fingerprint.
-- **Personal data** is masked: `s***@example.com`, `***5678`, `S*** C***`. A payer's IP address and browser are never recorded.
+- **Personal data** is masked: `s***@example.com`, `***5678`, `S*** C***`. A payer's IP address and browser are never recorded. Instead a payer's calls carry a code such as `payer_9f2c41d07a6be315`: the same visitor to your business gets the same code, so you can follow their steps, and no other business sees that code.
 - **Anything that is not JSON or a form**, or is very large, is not stored. You see a note saying so.
 
 Free text, such as a description or your own metadata, is cleaned only where it matches something recognised. Never put secrets or sensitive personal data in it.
