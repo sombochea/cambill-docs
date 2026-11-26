@@ -3,7 +3,7 @@ title: "API logs"
 description: "See what your integration sent, what came back, and what the bank said."
 ---
 
-When a call fails, find it in **Dashboard → Developers → API logs**. Each entry shows the request, the response, the error, and every other call under the same trace, including what CamBill asked the bank.
+When a call fails, find it in **Dashboard → Developers → API logs**. Each entry shows the request, the response, the error, and a timeline of every other call in the same trace.
 
 ## Find a request
 
@@ -21,6 +21,19 @@ Send your own 32-character hex `X-Trace-ID` to line CamBill's logs up with yours
 
 Without a date filter the list covers the last 7 days. Searching an id looks through everything still kept.
 
+## One payment, one trace
+
+A payment's later calls are filed under the trace of the request that created it: your reads of it, the payer's checkout steps, the bank's callback, CamBill's checks with the bank, and each webhook delivery. The timeline shows which call led to which.
+
+| Field | What it is |
+| --- | --- |
+| `trace_id` | The trace the calls share: the one of the request that created the payment. |
+| `request_id` | The `X-Trace-ID` of the request involved. This is the id in its response and error body. |
+| `span_id` | This call. |
+| `parent_span_id` | The call that led to it. |
+
+Searching a `trace_id` or a `request_id` finds the record. An invoice's payment stays in the invoice's trace. A subscription starts a new trace for each billing period. Records made before this release have only their own `trace_id`.
+
 ## Where the fault is
 
 | You see | Look at |
@@ -32,7 +45,7 @@ Without a date filter the list covers the last 7 days. Searching an id looks thr
 
 ## What is recorded
 
-By default: the payment-intent, invoice and subscription APIs, a payer's checkout actions, bank pushbacks, calls to banks and providers, and any server error. The customer and catalogue APIs, status polling and dashboard changes are recorded only if the platform operator turns them on. Logs are kept for 30 days by default and never more than 90.
+By default: the payment-intent, invoice and subscription APIs, a payer's checkout actions, bank pushbacks, calls to banks and providers, webhook delivery attempts, and any server error. The customer and catalogue APIs, status polling and dashboard changes are recorded only if the platform operator turns them on. Logs are kept for 30 days by default and never more than 90.
 
 Logging is a debugging aid. It never slows or fails your request, and under heavy load an entry can be missing. Use [webhooks](/docs/webhooks) and the API itself, not the logs, as your record of what happened.
 

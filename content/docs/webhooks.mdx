@@ -5,6 +5,8 @@ description: "Get told when something happens, and check that it really came fro
 
 Set your endpoint in **API & webhooks**. CamBill sends a `POST` with JSON and retries failures with backoff.
 
+The same page lists every delivery of the last 90 days. Open one to see the event sent and each attempt: when it ran, how your endpoint answered and how long it took. Secrets in your endpoint's address are removed before it is saved.
+
 ```json
 { "id": "evt_…", "type": "invoice.paid", "created_at": "2026-12-01T09:30:00Z", "data": { "id": "inv_test_…", "status": "paid", "total": 10000 } }
 ```
