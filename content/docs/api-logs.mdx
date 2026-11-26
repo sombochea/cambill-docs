@@ -1,0 +1,47 @@
+---
+title: "API logs"
+description: "See what your integration sent, what came back, and what the bank said."
+---
+
+When a call fails, find it in **Dashboard → Developers → API logs**. Each entry shows the request, the response, the error, and every other call under the same trace, including what CamBill asked the bank.
+
+## Find a request
+
+Every response carries a `trace_id` (header `X-Trace-ID`, and in every error body). Search for it, or for a payment or invoice id, or for the start of a path such as `/v1/invoices`.
+
+```bash
+curl -i https://cambill.cubis.tech/v1/payment-intents \
+  -H "X-API-Key: $CAMBILL_API_KEY" -H "Content-Type: application/json" \
+  -d '{"amount": -1, "currency": "USD"}'
+# HTTP/2 400
+# x-trace-id: 4bf92f3577b34da6a3ce929d0e0e4736
+```
+
+Send your own 32-character hex `X-Trace-ID` to line CamBill's logs up with yours.
+
+Without a date filter the list covers the last 7 days. Searching an id looks through everything still kept.
+
+## Where the fault is
+
+| You see | Look at |
+| --- | --- |
+| A `4xx` | The request. The error title and detail say what was rejected. |
+| A `5xx` | CamBill. Send support the `trace_id`: they can see the internal cause. |
+| A bank or provider call that failed or got no answer | The bank, or your connector's credentials. |
+| Nothing at all | The request never reached CamBill, used an unknown API key, or its kind is not recorded. |
+
+## What is recorded
+
+By default: the payment-intent, invoice and subscription APIs, a payer's checkout actions, bank pushbacks, calls to banks and providers, and any server error. The customer and catalogue APIs, status polling and dashboard changes are recorded only if the platform operator turns them on. Logs are kept for 30 days by default and never more than 90.
+
+Logging is a debugging aid. It never slows or fails your request, and under heavy load an entry can be missing. Use [webhooks](/docs/webhooks) and the API itself, not the logs, as your record of what happened.
+
+## What is removed
+
+Values are cleaned before they are stored, so neither you nor CamBill can read them back.
+
+- **Secrets** (API keys, client secrets, tokens, signatures) show as `[REDACTED fp:1a2b3c4d]`. The same value always has the same fingerprint, so you can tell whether two requests used the same key. Passwords and card data have no fingerprint.
+- **Personal data** is masked: `s***@example.com`, `***5678`, `S*** C***`. A payer's IP address and browser are never recorded.
+- **Anything that is not JSON or a form**, or is very large, is not stored. You see a note saying so.
+
+Free text, such as a description or your own metadata, is cleaned only where it matches something recognised. Never put secrets or sensitive personal data in it.

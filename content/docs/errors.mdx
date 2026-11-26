@@ -12,7 +12,7 @@ Failures are `application/problem+json` ([RFC 9457](https://www.rfc-editor.org/r
 
 Its `type` is a page: [`https://cambill.cubis.tech/errors/403`](https://cambill.cubis.tech/errors/403) explains that status, its common titles and what to do. See [all errors](https://cambill.cubis.tech/errors).
 
-Quote `trace_id` when you ask for help: it finds the request in the audit log. In the SDK it is a `CamBillError`:
+Quote `trace_id` when you ask for help: it finds the request in your [API logs](/docs/api-logs) and the audit log. In the SDK it is a `CamBillError`:
 
 ```ts
 try {
