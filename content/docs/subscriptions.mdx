@@ -29,6 +29,82 @@ await cambill.subscriptions.cancel(id, { at_period_end: true }) // or now: cance
 await cambill.subscriptions.update(id, { items: [/* … */], days_until_due: 7 }) // from the next period
 ```
 
+## Upgrade or downgrade
+
+| You want | Call | When it applies | Money |
+| --- | --- | --- | --- |
+| A pricier plan now | `upgrade` | When the upgrade invoice is paid | The difference for the time left |
+| A cheaper plan, or any change later | `update` | The next period | Nothing now, no refund |
+
+The renewal date never moves.
+
+### Upgrade now
+
+```ts
+const items = [{ price: pro.id, quantity: 1 }] // the full new list
+const quote = await cambill.subscriptions.previewUpgrade(id, { items }) // quote.lines, quote.total
+
+const sub = await cambill.subscriptions.upgrade(id, {
+  items,
+  proration_date: quote.proration_date, // invoice exactly what you showed
+})
+const invoice = await cambill.invoices.retrieve(sub.pending_update!.invoice.id)
+redirect(invoice.hosted_invoice_url) // grant the new plan on subscription.upgraded
+```
+
+Without `proration_date` the upgrade is priced at the moment of the call, so it can differ from the preview. A `proration_date` is accepted for one hour.
+
+### What the invoice shows
+
+Half way through a month, moving from Basic ($10) to Pro ($30):
+
+| Line | Amount |
+| --- | --- |
+| Unused time on Basic | −$5.00 |
+| Remaining time on Pro | $15.00 |
+| **Total** (before tax) | **$10.00** |
+
+The next renewal is $30.
+
+- Each item that changes has a credit for its unused time and a charge for the time remaining. A new item has only the charge, a removed one only the credit. Items that stay the same are not listed.
+- A quantity change reads "Unused time on 2 × Seat" and "Remaining time on 5 × Seat". A price with a nickname reads "Remaining time on Hosting (Pro)".
+- Each of these lines has `proration: true` and the item's `price_id`. A credit's `unit_amount` and `amount` are negative.
+- `quantity` is 1 on a proration line, because part of a period does not divide by the quantity.
+- Time is counted to the second, and each line is rounded to the currency's smallest unit.
+- The amounts are after the discount the current period had, so no coupon is applied again. Your default tax rate applies to each line.
+- The total must be more than zero.
+
+### While it waits
+
+- The current period's invoice must be paid. One upgrade can wait at a time, and items cannot be updated while it does.
+- The invoice can be paid for 24 hours, or until the period ends. After that, or after a renewal, pause or cancel, it is voided and the old plan stays. To cancel it yourself, [void the invoice](/docs/invoices).
+- A voided upgrade sends `invoice.voided` with `upgrade_of`.
+- If money still arrives for a dropped upgrade, you get `subscription.upgrade_unapplied`: refund it.
+- An upgrade invoice cannot be duplicated.
+
+### Downgrade
+
+Use `update`. It bills from the next period. `items` changes at once, so grant access from `billed_items`, which changes when the new period is billed. To undo it before then, `update` back to `billed_items`.
+
+In the dashboard, open the subscription and choose **Change plan**: **Upgrade now** shows the lines and what is due before you confirm, and **From next period** downgrades. While an upgrade waits, the same place copies its payment link or cancels it.
+
+Changing the currency or billing interval needs a new subscription.
+
+### Coming from Stripe Billing
+
+| Stripe | CamBill |
+| --- | --- |
+| "Unused time" and "Remaining time" proration lines | The same, for each item that changes |
+| `proration_date` on the preview and the update | The same |
+| `proration_behavior=always_invoice` with `payment_behavior=pending_if_incomplete` | `upgrade`: invoiced at once, applied only when paid. The customer pays from the link; nothing is charged automatically |
+| A pending update expires after 23 hours | After 24 hours, or at the period's end |
+| `customer.subscription.pending_update_applied` | `subscription.upgraded` |
+| `customer.subscription.pending_update_expired` | `invoice.voided` with `upgrade_of` |
+| A new update replaces a pending one | Void the pending invoice first |
+| A downgrade creates a credit, or a subscription schedule defers it | `update` defers it to the next period. There are no credits or customer balance |
+| `proration_behavior=create_prorations` puts prorations on the next invoice | Not supported |
+| Changing the billing interval resets the billing date | Not supported: create a new subscription |
+
 ## If an invoice cannot be issued
 
 A live-mode limit, an unverified business, or a feature turned off can stop an invoice from being issued. The invoice is kept as a **draft**, the subscription's `last_error` says why, and CamBill is alerted. A period is never skipped.

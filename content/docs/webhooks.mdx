@@ -32,6 +32,8 @@ Every event has the same envelope: `id` (unique, use it to ignore a repeat), `ty
 | `subscription.renewed` | A new period started (not the first). | the subscription |
 | `subscription.invoice_created` | An invoice was created for a period. | the subscription, plus `invoice`, `period_start`, `period_end`, `invoice_details` |
 | `subscription.past_due` | An invoice of a subscription is overdue. Once per invoice. | the subscription, plus `past_due_invoice` |
+| `subscription.upgraded` | A mid-period [upgrade](/docs/subscriptions#upgrade-or-downgrade) was paid and applies. | the subscription, with `previous_attributes` and `upgrade_invoice` |
+| `subscription.upgrade_unapplied` | An upgrade was paid after it was dropped, so nothing changed. Refund it. | the subscription, plus `upgrade_invoice` |
 
 ## Subscription events carry the whole subscription
 
@@ -68,7 +70,7 @@ The SDK types this: `constructEvent` returns a union, so `event.type === "subscr
 
 Keep your own users and plans, give CamBill their ids (`external_id` on customers and products), and:
 
-1. **Listen**: on `subscription.created` and `subscription.renewed`, activate or extend access for `data.customer_details.external_id` on `data.items[0].product.external_id`; on `subscription.canceled`, end it; on `subscription.past_due`, warn or suspend. The customer pays each invoice from its link, so `invoice.paid` tells you the money arrived.
+1. **Listen**: on `subscription.created` and `subscription.renewed`, activate or extend access for `data.customer_details.external_id` on `data.items[0].product.external_id`; on `subscription.upgraded`, move them to the new plan; on `subscription.canceled`, end it; on `subscription.past_due`, warn or suspend. The customer pays each invoice from its link, so `invoice.paid` tells you the money arrived.
 2. **Reconcile**: pull what CamBill has, by your own ids, whenever you like:
 
 ```ts

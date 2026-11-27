@@ -541,6 +541,7 @@ Bills the customer by invoice each period, in advance. The first invoice is crea
 | `customer` | string |  |  |
 | `customer_external_id` | string |  |  |
 | `items` | object[] |  |  |
+| `proration_date` | string |  | The instant to price from, to the second. Send back the preview's, so the invoice is what was previewed. At most an hour old; leave it out for now. |
 | `days_until_due` | integer |  |  |
 | `auto_issue` | boolean |  | Issue each invoice as it is created |
 | `cancel_at_period_end` | boolean |  |  |
@@ -594,6 +595,7 @@ Returns `200` ok. Errors: `404`.
 | `customer` | string |  |  |
 | `customer_external_id` | string |  |  |
 | `items` | object[] |  |  |
+| `proration_date` | string |  | The instant to price from, to the second. Send back the preview's, so the invoice is what was previewed. At most an hour old; leave it out for now. |
 | `days_until_due` | integer |  |  |
 | `auto_issue` | boolean |  | Issue each invoice as it is created |
 | `cancel_at_period_end` | boolean |  |  |
@@ -649,6 +651,36 @@ Lets you test your integration without waiting a month. Answers 403 with a live 
 | `sub` | path | string |  |
 
 Returns `200` ok. Errors: `403`, `409`.
+
+### What a mid-period upgrade would invoice now
+
+`POST /v1/subscriptions/{sub}/upgrade/preview`
+
+| Parameter | In | Type | |
+| --- | --- | --- | --- |
+| `sub` | path | string |  |
+
+| Field | Type | Required | |
+| --- | --- | --- | --- |
+| `items` | object[] | yes | The subscription's full new list of items, in the same currency and billing interval. |
+
+Returns `200` the upgrade invoice as it would be: `lines`, `subtotal`, `tax_total`, `total`, `currency`, `items`, `proration_date`, `period_start`, `period_end`. nothing is saved.. Errors: `400`, `409`.
+
+### Upgrade mid-period, once the difference is paid
+
+`POST /v1/subscriptions/{sub}/upgrade`
+
+Invoices the difference for the time left in the current period: for each item that changes, a credit line for the unused time on the old one (negative) and a charge line for the time remaining on the new one. The items change when that invoice is paid (`subscription.upgraded`); the renewal date does not move. Unpaid after 24 hours or the period's end, or overtaken by a renewal, pause or cancel, the invoice is voided and nothing changes. Void it yourself to cancel. For a cheaper plan, update the subscription instead.
+
+| Parameter | In | Type | |
+| --- | --- | --- | --- |
+| `sub` | path | string |  |
+
+| Field | Type | Required | |
+| --- | --- | --- | --- |
+| `items` | object[] | yes | The subscription's full new list of items, in the same currency and billing interval. |
+
+Returns `201` the subscription, with `pending_update` naming the invoice to be paid.. Errors: `400`, `409`.
 
 ## Objects
 
@@ -744,6 +776,8 @@ Returns `200` ok. Errors: `403`, `409`.
 | `days_until_due` | integer |  |  |
 | `auto_issue` | boolean |  |  |
 | `cancel_at_period_end` | boolean |  |  |
+| `billed_items` | object[] |  | What the current period was billed for. `items` runs ahead of it after an update, so grant access from this. |
+| `pending_update` | object or null |  | An upgrade waiting to be paid. |
 | `latest_invoice` | object or null |  |  |
 | `customer_details` | object |  | With expand, and in webhooks. |
 | `previous_attributes` | object |  | In subscription.* change events: the old values of what changed. |
@@ -815,6 +849,7 @@ Returns `200` ok. Errors: `403`, `409`.
 | `coupon` | object or null |  |  |
 | `tax_id` | string |  | The business's tax registration number |
 | `subscription` | string |  | The subscription this invoice bills |
+| `upgrade_of` | string |  | The subscription this invoice upgrades mid-period |
 | `period_start` | string or null |  | Start of the billed period |
 | `period_end` | string or null |  | End of the billed period (the next period starts here) |
 | `lines` | object[] |  |  |
